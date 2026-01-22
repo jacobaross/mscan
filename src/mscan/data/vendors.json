@@ -157,6 +157,19 @@
       }
     },
     {
+      "vendor_name": "Teads",
+      "category": "CTV and Streaming Attribution",
+      "detection_rules": {
+        "domains": [
+          "p.teads.tv",
+          "l.teads.tv",
+          "t.teads.tv",
+          "cm.teads.tv"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
       "vendor_name": "Cookiebot",
       "category": "Consent Management",
       "detection_rules": {

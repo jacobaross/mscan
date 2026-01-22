@@ -158,13 +158,14 @@ async def _scan_page(context, url: str, timeout_seconds: int, base_domain: str, 
     page.on('request', handle_request)
 
     try:
-        # Navigate to page and wait for network to settle
+        # Navigate to page - use 'load' event (DOM ready) with short timeout
+        # Don't use 'networkidle' - retail sites with trackers never reach it
         status("Waiting for page to load...")
         try:
-            await page.goto(url, wait_until='networkidle', timeout=60000)
+            await page.goto(url, wait_until='load', timeout=15000)
         except PlaywrightTimeout:
-            # Timeout is fine - heavy sites never reach networkidle
-            status("Page still loading trackers... (continuing anyway)")
+            # Page took too long - continue anyway, we're capturing requests
+            status("Page slow to respond... (continuing anyway)")
 
         # Additional wait for lazy-loaded scripts with periodic status updates
         wait_messages = [
