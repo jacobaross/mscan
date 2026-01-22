@@ -1,6 +1,7 @@
 """CLI entry point for the Martech Scanner."""
 
 import json
+import subprocess
 import click
 from pathlib import Path
 from urllib.parse import urlparse
@@ -10,7 +11,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from mscan.scanner import scan_website_sync
-from mscan.fingerprints import match_vendors, load_vendors, get_vendors_path
+from mscan.fingerprints import match_vendors, load_vendors, get_vendors_path, find_unknown_domains
 from mscan.report import generate_report
 
 # Competitive categories - these get special attention in takeaways
@@ -89,18 +90,14 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
                 vendors = by_category[cat]
                 vendor_names = [v['vendor_name'] for v in vendors]
 
-                # Add details if available
-                details = [v['details'] for v in vendors if v.get('details')]
-                detail_str = f" [dim]({details[0]})[/dim]" if details else ""
-
                 # Count indicator for multiple vendors
                 count_str = f" [dim]({len(vendors)} vendors)[/dim]" if len(vendors) > 1 else ""
 
                 # Highlight competitive categories
                 if cat in COMPETITIVE_CATEGORIES:
-                    console.print(f"  [yellow]{short_name}:[/yellow] {', '.join(vendor_names)}{detail_str}{count_str}")
+                    console.print(f"  [yellow]{short_name}:[/yellow] {', '.join(vendor_names)}{count_str}")
                 else:
-                    console.print(f"  [white]{short_name}:[/white] {', '.join(vendor_names)}{detail_str}{count_str}")
+                    console.print(f"  [white]{short_name}:[/white] {', '.join(vendor_names)}{count_str}")
 
         # Stats line
         console.print()
@@ -151,6 +148,116 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
     console.print(f"[dim]Report saved: {report_path}[/dim]")
 
 
+def show_unknown_domains(unknown_domains: list[dict], console: Console):
+    """Display unknown domains and allow user to add them as vendors."""
+    from rich.table import Table
+
+    console.print()
+    console.rule("[bold]UNKNOWN DOMAINS[/bold]", style="cyan")
+    console.print()
+    console.print("[dim]These third-party domains were detected but aren't in the vendor database.[/dim]")
+    console.print()
+
+    # Show table of unknown domains
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Domain", style="green")
+    table.add_column("Requests", justify="right")
+    table.add_column("Full Domains", style="dim")
+
+    top_domains = unknown_domains[:20]  # Show top 20
+    for i, item in enumerate(top_domains, 1):
+        full_domains = ', '.join(item['full_domains'][:2])
+        if len(item['full_domains']) > 2:
+            full_domains += f" (+{len(item['full_domains']) - 2})"
+        table.add_row(
+            str(i),
+            item['domain'],
+            str(item['count']),
+            full_domains
+        )
+
+    console.print(table)
+
+    if len(unknown_domains) > 20:
+        console.print(f"[dim]...and {len(unknown_domains) - 20} more[/dim]")
+
+    console.print()
+    console.print("[bold]Add a vendor?[/bold] Enter number to add, or press Enter to exit:")
+    selection = click.prompt("Selection", default="", show_default=False)
+
+    if selection.isdigit():
+        idx = int(selection) - 1
+        if 0 <= idx < len(top_domains):
+            selected = top_domains[idx]
+            add_vendor_quick(selected, console)
+
+
+def add_vendor_quick(domain_info: dict, console: Console):
+    """Quick workflow to add a new vendor from an unknown domain."""
+    console.print()
+    console.print(f"[bold]Adding vendor for domain:[/bold] {domain_info['domain']}")
+    console.print()
+
+    # Prompt for vendor name
+    vendor_name = click.prompt("Vendor name", default=domain_info['domain'].split('.')[0].title())
+
+    # Show category options
+    categories = [
+        'Direct Mail and Offline Attribution',
+        'CTV and Streaming Attribution',
+        'Social Media Advertising',
+        'Search and Display Advertising',
+        'Affiliate and Performance Marketing',
+        'Analytics and Experimentation',
+        'Identity and Data Infrastructure',
+        'Consent Management',
+        'Other/Uncategorized'
+    ]
+
+    console.print()
+    console.print("[bold]Select category:[/bold]")
+    for i, cat in enumerate(categories, 1):
+        console.print(f"  {i}. {cat}")
+
+    cat_choice = click.prompt("Category number", type=int, default=9)
+    if 1 <= cat_choice <= len(categories):
+        category = categories[cat_choice - 1]
+    else:
+        category = 'Other/Uncategorized'
+
+    # Create vendor entry
+    new_vendor = {
+        "vendor_name": vendor_name,
+        "category": category,
+        "detection_rules": {
+            "domains": domain_info['full_domains'],
+            "url_patterns": []
+        }
+    }
+
+    # Show summary
+    console.print()
+    console.print("[bold]New vendor entry:[/bold]")
+    console.print(json.dumps(new_vendor, indent=2))
+
+    # Confirm
+    if click.confirm("\nAdd this vendor to the database?", default=True):
+        vendors_file = get_vendors_path()
+        with open(vendors_file, 'r') as f:
+            data = json.load(f)
+
+        data['vendors'].append(new_vendor)
+        data['vendors'].sort(key=lambda v: (v['category'], v['vendor_name']))
+
+        with open(vendors_file, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        console.print(f"\n[green]Successfully added '{vendor_name}' to vendors.json[/green]")
+    else:
+        console.print("[yellow]Cancelled[/yellow]")
+
+
 @click.group()
 def cli():
     """Martech Intelligence Scanner - Identify marketing tech on any website."""
@@ -190,19 +297,40 @@ def scan(url: str, timeout: int, pages: int, headless: bool, show_report: bool):
     detected = match_vendors(requests)
     console.print(f"  Detected {len(detected)} vendors")
 
-    # Phase 3: Generate report
-    console.print("[dim]Phase 3: Generating report...[/dim]")
+    # Phase 3: Find unknown domains
+    console.print("[dim]Phase 3: Finding unknown domains...[/dim]")
+    base_domain = extract_domain_name(url)
+    unknown_domains = find_unknown_domains(requests, base_domain)
+    console.print(f"  Found {len(unknown_domains)} unknown third-party domains")
+
+    # Phase 4: Generate report
+    console.print("[dim]Phase 4: Generating report...[/dim]")
     report_path = generate_report(scan_results, detected)
 
     # Print insightful summary
     print_scan_summary(detected, url, report_path, console)
 
-    # Show full report if requested
+    # Show full report if requested via flag
     if show_report:
         console.print()
         console.rule("[bold]FULL REPORT[/bold]", style="cyan")
         with open(report_path, 'r') as f:
             console.print(f.read())
+
+    # Interactive options
+    console.print()
+    console.print("[bold]Options:[/bold]")
+    console.print("  [cyan]v[/cyan] - View report in nvim")
+    if unknown_domains:
+        console.print(f"  [cyan]u[/cyan] - View {len(unknown_domains)} unknown domains (potential new vendors)")
+    console.print("  [cyan]Enter[/cyan] - Exit")
+
+    choice = click.prompt("Choice", default="", show_default=False)
+
+    if choice.lower() == 'v':
+        subprocess.run(['nvim', report_path])
+    elif choice.lower() == 'u' and unknown_domains:
+        show_unknown_domains(unknown_domains, console)
 
 
 @cli.command('list-vendors')
