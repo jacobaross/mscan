@@ -9,15 +9,19 @@ from mscan.fingerprints import get_all_categories, load_vendors
 
 # Category display order: direct competitors first, then others
 CATEGORY_ORDER = [
-    'Direct Mail and Offline Attribution',
-    'CTV and Streaming Attribution',
-    'Social Media Advertising',
-    'Search and Display Advertising',
-    'Affiliate and Performance Marketing',
-    'Analytics and Experimentation',
-    'Identity and Data Infrastructure',
-    'Consent Management',
-    'Other/Uncategorized'
+    'Direct Mail',
+    'CTV',
+    'Social Media',
+    'Search',
+    'Affiliate',
+    'Performance',
+    'Analytics',
+    'ID & Data Infra',
+    'Consent Mgmt',
+    'CDP',
+    'DSP',
+    'Email',
+    'Other',
 ]
 
 
@@ -124,22 +128,22 @@ def _build_summary(detected_vendors: list[dict]) -> str:
     lines.append("")
 
     # Direct Mail
-    if 'Direct Mail and Offline Attribution' in by_category:
-        vendors = by_category['Direct Mail and Offline Attribution']
+    if 'Direct Mail' in by_category:
+        vendors = by_category['Direct Mail']
         names = [v['vendor_name'] for v in vendors]
         details = [v['details'] for v in vendors if v.get('details')]
         detail_str = f" ({details[0]})" if details else ""
         lines.append(f"  * Direct Mail: {', '.join(names)}{detail_str}")
 
     # CTV
-    if 'CTV and Streaming Attribution' in by_category:
-        vendors = by_category['CTV and Streaming Attribution']
+    if 'CTV' in by_category:
+        vendors = by_category['CTV']
         names = [v['vendor_name'] for v in vendors]
         lines.append(f"  * CTV/Streaming: {', '.join(names)}")
 
     # Social
-    if 'Social Media Advertising' in by_category:
-        vendors = by_category['Social Media Advertising']
+    if 'Social Media' in by_category:
+        vendors = by_category['Social Media']
         names = [v['vendor_name'] for v in vendors]
         if len(names) >= 3:
             lines.append(f"  * Social (heavy): {', '.join(names)}")
@@ -147,26 +151,32 @@ def _build_summary(detected_vendors: list[dict]) -> str:
             lines.append(f"  * Social: {', '.join(names)}")
 
     # Affiliate
-    if 'Affiliate and Performance Marketing' in by_category:
-        vendors = by_category['Affiliate and Performance Marketing']
+    if 'Affiliate' in by_category:
+        vendors = by_category['Affiliate']
         names = [v['vendor_name'] for v in vendors]
         lines.append(f"  * Affiliate: {', '.join(names)}")
 
+    # Performance
+    if 'Performance' in by_category:
+        vendors = by_category['Performance']
+        names = [v['vendor_name'] for v in vendors]
+        lines.append(f"  * Performance: {', '.join(names)}")
+
     # Analytics depth
-    if 'Analytics and Experimentation' in by_category:
-        vendors = by_category['Analytics and Experimentation']
+    if 'Analytics' in by_category:
+        vendors = by_category['Analytics']
         names = [v['vendor_name'] for v in vendors]
         lines.append(f"  * Analytics: {', '.join(names)}")
 
     # Identity
-    if 'Identity and Data Infrastructure' in by_category:
-        vendors = by_category['Identity and Data Infrastructure']
+    if 'ID & Data Infra' in by_category:
+        vendors = by_category['ID & Data Infra']
         names = [v['vendor_name'] for v in vendors]
         lines.append(f"  * Identity: {', '.join(names)}")
 
     # Consent
-    if 'Consent Management' in by_category:
-        vendors = by_category['Consent Management']
+    if 'Consent Mgmt' in by_category:
+        vendors = by_category['Consent Mgmt']
         names = [v['vendor_name'] for v in vendors]
         lines.append(f"  * Consent: {', '.join(names)}")
 
@@ -253,14 +263,18 @@ def _build_vendor_table(detected_vendors: list[dict]) -> str:
 def _short_category_name(category: str) -> str:
     """Return a shortened category name for display."""
     mapping = {
-        'Direct Mail and Offline Attribution': 'DIRECT MAIL',
-        'CTV and Streaming Attribution': 'CTV/STREAMING',
-        'Social Media Advertising': 'SOCIAL',
-        'Search and Display Advertising': 'SEARCH/DISPLAY',
-        'Affiliate and Performance Marketing': 'AFFILIATE',
-        'Analytics and Experimentation': 'ANALYTICS',
-        'Identity and Data Infrastructure': 'IDENTITY',
-        'Consent Management': 'CONSENT',
-        'Other/Uncategorized': 'OTHER'
+        'Direct Mail': 'DIRECT MAIL',
+        'CTV': 'CTV/STREAMING',
+        'Social Media': 'SOCIAL',
+        'Search': 'SEARCH',
+        'Affiliate': 'AFFILIATE',
+        'Performance': 'PERFORMANCE',
+        'Analytics': 'ANALYTICS',
+        'ID & Data Infra': 'IDENTITY',
+        'Consent Mgmt': 'CONSENT',
+        'CDP': 'CDP',
+        'DSP': 'DSP',
+        'Email': 'EMAIL',
+        'Other': 'OTHER',
     }
     return mapping.get(category, category.upper())

@@ -221,15 +221,19 @@ def get_all_categories(vendors: list[dict] = None) -> list[str]:
 
     # Return in preferred order
     preferred_order = [
-        'Direct Mail and Offline Attribution',
-        'Social Media Advertising',
-        'Search and Display Advertising',
-        'Affiliate and Performance Marketing',
-        'CTV and Streaming Attribution',
-        'Analytics and Experimentation',
-        'Identity and Data Infrastructure',
-        'Consent Management',
-        'Other/Uncategorized'
+        'Direct Mail',
+        'CTV',
+        'Social Media',
+        'Search',
+        'Affiliate',
+        'Performance',
+        'Analytics',
+        'ID & Data Infra',
+        'Consent Mgmt',
+        'CDP',
+        'DSP',
+        'Email',
+        'Other',
     ]
 
     ordered = [c for c in preferred_order if c in categories]
