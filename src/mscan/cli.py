@@ -416,8 +416,9 @@ def cli():
 @click.option('--timeout', '-t', default=10, help='Seconds to wait for network activity per page')
 @click.option('--pages', '-p', default=1, help='Maximum internal pages to scan beyond homepage')
 @click.option('--headless', is_flag=True, help='Run in headless mode (may be blocked by bot detection)')
+@click.option('--system-browser', '-s', is_flag=True, help='Use system Chromium (bypasses Akamai/bot detection)')
 @click.option('--show-report', '-r', is_flag=True, help='Display full report in terminal after scan')
-def scan(url: str, timeout: int, pages: int, headless: bool, show_report: bool):
+def scan(url: str, timeout: int, pages: int, headless: bool, system_browser: bool, show_report: bool):
     """Scan a website for martech vendors.
 
     URL can be a domain (example.com) or full URL (https://example.com)
@@ -440,6 +441,7 @@ def scan(url: str, timeout: int, pages: int, headless: bool, show_report: bool):
             timeout_seconds=timeout,
             max_internal_pages=pages,
             headless=headless,
+            system_browser=system_browser,
             status_callback=update_status
         )
 

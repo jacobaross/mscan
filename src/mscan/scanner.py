@@ -39,7 +39,7 @@ def _score_product_likelihood(url: str) -> int:
     return score
 
 
-async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: int = 3, headless: bool = False, status_callback=None) -> dict:
+async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: int = 3, headless: bool = False, system_browser: bool = False, status_callback=None) -> dict:
     """
     Scan a website and capture all network requests.
 
@@ -48,6 +48,7 @@ async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: 
         timeout_seconds: How long to wait for network activity per page
         max_internal_pages: Maximum number of internal pages to scan beyond homepage
         headless: Run in headless mode (may be blocked by bot detection)
+        system_browser: Use system Chromium instead of bundled (bypasses some bot detection)
 
     Returns:
         Dictionary with scan results including all captured URLs and pages scanned
@@ -64,31 +65,57 @@ async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: 
 
     async with async_playwright() as p:
         # Default to headed mode to avoid bot detection
-        browser = await p.chromium.launch(
-            headless=headless,
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-            ]
-        )
+        if system_browser:
+            # For system browser: minimal args to avoid fingerprinting
+            import shutil
+            system_chromium = shutil.which('chromium') or shutil.which('google-chrome') or shutil.which('chromium-browser')
+            launch_args = {
+                'headless': headless,
+                'executable_path': system_chromium,
+                'args': ['--disable-blink-features=AutomationControlled']
+            }
+        else:
+            # For bundled Chromium: extra args needed for compatibility
+            launch_args = {
+                'headless': headless,
+                'args': [
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--no-sandbox',
+                ]
+            }
+
+        browser = await p.chromium.launch(**launch_args)
 
         status("Putting on disguise...")
 
-        context = await browser.new_context(
-            user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            viewport={'width': 1920, 'height': 1080},
-            locale='en-US',
-            timezone_id='America/New_York',
-            java_script_enabled=True,
-        )
+        # Use a realistic user agent (updated for system browser)
+        if system_browser:
+            # Match typical system Chromium version
+            user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+        else:
+            user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
-        # Remove webdriver flag to avoid detection
-        await context.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-        """)
+        # Context options - skip locale for system browser (triggers Akamai detection)
+        context_opts = {
+            'user_agent': user_agent,
+            'viewport': {'width': 1920, 'height': 1080},
+            'java_script_enabled': True,
+        }
+        if not system_browser:
+            context_opts['locale'] = 'en-US'
+            context_opts['timezone_id'] = 'America/New_York'
+
+        context = await browser.new_context(**context_opts)
+
+        # Only add webdriver-hiding script for bundled Chromium
+        # System browsers don't expose webdriver, and the script itself can trigger detection
+        if not system_browser:
+            await context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """)
 
         # Scan homepage first
         status("Visiting homepage...")
@@ -204,6 +231,6 @@ async def _scan_page(context, url: str, timeout_seconds: int, base_domain: str, 
     return captured_requests, internal_links
 
 
-def scan_website_sync(url: str, timeout_seconds: int = 10, max_internal_pages: int = 3, headless: bool = False, status_callback=None) -> dict:
+def scan_website_sync(url: str, timeout_seconds: int = 10, max_internal_pages: int = 3, headless: bool = False, system_browser: bool = False, status_callback=None) -> dict:
     """Synchronous wrapper for scan_website."""
-    return asyncio.run(scan_website(url, timeout_seconds, max_internal_pages, headless, status_callback))
+    return asyncio.run(scan_website(url, timeout_seconds, max_internal_pages, headless, system_browser, status_callback))
