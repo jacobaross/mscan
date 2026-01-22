@@ -1,55 +1,165 @@
 # mscan
 
-CLI tool to scan websites and identify their marketing technology (martech) stack by matching network requests against a vendor fingerprint database.
+```
+        .━━━━━━━.
+       ╱    ◉    ╲
+      │    ╱ ╲    │
+      │   ╱ m ╲   │       Watching for sneaky trackers...
+       ╲ ╱━━━━━╲ ╱        Cataloging the surveillance...
+        '━━━┳━━━'
+            ┃
+            ┃
+           ╱
+          ╱
+```
+
+**Martech Intelligence Scanner** — CLI tool that scans websites and exposes their marketing/advertising technology stack by sniffing network requests and matching them against a fingerprint database.
+
+## What It Does
+
+Point mscan at any website and it will:
+
+- Fire up a real browser (Chromium via Playwright)
+- Capture all network requests as the page loads
+- Match requests against 40+ known martech vendors
+- Surface unknown third-party domains for investigation
+- Generate actionable intelligence reports
+
+Perfect for competitive analysis, sales prospecting, or just satisfying your curiosity about what's tracking you.
 
 ## Installation
 
 ```bash
-# Install the package
+# Clone and install
+git clone https://github.com/jacobaross/mscan.git
+cd mscan
 pip install -e .
 
-# Install Playwright browser
+# Install browser
 playwright install chromium
-
-# Optional: Install man page
-sudo cp man/mscan.1 /usr/local/share/man/man1/
 ```
 
-## Usage
-
-### Scan a website
+## Quick Start
 
 ```bash
-mscan scan example.com
-mscan scan https://example.com --timeout 15 --pages 5
-mscan scan example.com --headless  # Use headless mode (may be blocked)
+# Scan a website
+mscan scan nike.com
+
+# Scan with longer timeout and more pages
+mscan scan bestbuy.com --timeout 15 --pages 3
+
+# Headless mode (faster but may be blocked)
+mscan scan target.com --headless
 ```
 
-### List vendors in database
+## Sample Output
+
+```
+━━━━━━━━━━━━━━━━ SCAN COMPLETE: NIKE.COM ━━━━━━━━━━━━━━━━
+
+FINDINGS
+  [2] Analytics: Google Analytics, Hotjar
+  [1] Social Media: Meta Pixel
+  [1] Performance: Criteo
+  [1] Consent Mgmt: OneTrust
+
+TAKEAWAY
+  → No direct mail vendor - potential prospect
+  → No CTV vendor - potential prospect
+
+Report saved: ./reports/nike-20260122-143022.txt
+
+Options:
+  v - View report in bat
+  u - View 12 unknown domains (potential new vendors)
+  Enter - Exit
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `mscan scan <url>` | Scan a website for martech vendors |
+| `mscan list-vendors` | List all vendors in the database |
+| `mscan add-vendor <name> -s <url>` | Add a new vendor by scanning a sample site |
+| `mscan manage-vendors` | Rename, move, or delete vendors |
+| `mscan manage-categories` | Rename or delete categories |
+
+### Scan Options
 
 ```bash
-mscan list-vendors
-mscan list-vendors --category "Analytics"
+-t, --timeout SECONDS   # Wait time per page (default: 10)
+-p, --pages NUM         # Internal pages to scan beyond homepage (default: 1)
+--headless              # Run browser in headless mode
+-r, --show-report       # Print full report to terminal
 ```
 
-### Add a new vendor
+## Vendor Categories
 
-```bash
-mscan add-vendor "Vendor Name" -s sample-site.com
+| Category | Examples |
+|----------|----------|
+| Direct Mail | PebblePost, Postie, LS Direct, Postpilot |
+| CTV | MNTN, Tatari, Innovid, Teads |
+| Social Media | Meta Pixel, TikTok, Pinterest, Snapchat, LinkedIn |
+| Search | Google Ads, Microsoft/Bing |
+| Analytics | Google Analytics, Amplitude, Heap, Hotjar, FullStory |
+| Affiliate | CJ Affiliate, Impact, Rakuten |
+| DSP | The Trade Desk |
+| Consent | OneTrust, Cookiebot, TrustArc |
+| Identity | LiveRamp, LiveIntent |
+
+## Adding New Vendors
+
+When mscan finds unknown domains, press `u` to review them:
+
+```
+UNKNOWN DOMAINS
+  #  Domain              Requests  Full Domains
+  1  newtracker.io       47        cdn.newtracker.io, api.newtracker.io
+  2  shop.app            23        shop.app
+
+Add vendors? Enter numbers (e.g., 1,3,5): 1,2
 ```
 
-## Output
+Type an existing vendor name to append domains to it, or enter a new name to create a vendor:
 
-Scan results are saved to `./reports/` as plain text files with:
-- Summary of detected vendors by category
-- Full vendor table showing which vendors were detected
+```
+[1/2] newtracker.io
+  Name [Newtracker]: New Tracker Inc
+  Category (0-9) [9]: 6
+  ✓ New Tracker Inc (Analytics)
+
+[2/2] shop.app
+  Name [Shop]: Shopify
+  Found existing 'Shopify'. Append domain? [Y/n]: y
+  ✓ Added to Shopify (Other)
+
+Done! Added 1 new vendor(s), appended domains to 1 existing vendor(s).
+```
 
 ## Documentation
 
-Full documentation is available via man page:
+Full docs via man page:
 
 ```bash
+# If installed system-wide
 man mscan
+
+# Or directly
+man man/mscan.1
 ```
 
-Or view directly: `man man/mscan.1`
+## How It Works
+
+Unlike static HTML analyzers, mscan runs a real browser to catch:
+
+- JavaScript-loaded tracking pixels
+- Lazy-loaded analytics scripts
+- Third-party requests triggered by user simulation
+- Requests that only fire after page interaction
+
+The scanner prioritizes product pages on e-commerce sites since these often have additional conversion tracking.
+
+## License
+
+MIT
