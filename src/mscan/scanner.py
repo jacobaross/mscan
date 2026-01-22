@@ -4,6 +4,40 @@ import asyncio
 from urllib.parse import urljoin, urlparse
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 
+# Patterns that indicate a product page (retail sites)
+PRODUCT_PATTERNS = [
+    '/product/', '/products/',
+    '/p/', '/item/', '/items/',
+    '/dp/', '/gp/product/',  # Amazon-style
+    '/shop/',  # if followed by more path segments
+    '/buy/',
+    '/sku/',
+]
+
+
+def _score_product_likelihood(url: str) -> int:
+    """Score how likely a URL is to be a product page. Higher = more likely."""
+    score = 0
+    parsed = urlparse(url)
+    path = parsed.path.lower()
+
+    # Check for product patterns
+    for pattern in PRODUCT_PATTERNS:
+        if pattern in path:
+            score += 10
+
+    # URLs with long alphanumeric segments often are product pages
+    # e.g., /p/ABC123-blue-widget or /products/mattress-purple-queen
+    segments = path.split('/')
+    for seg in segments:
+        if len(seg) > 5 and any(c.isdigit() for c in seg):
+            score += 5
+        # Long slug-like segments with hyphens are often product names
+        if len(seg) > 10 and '-' in seg:
+            score += 3
+
+    return score
+
 
 async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: int = 3, headless: bool = False, status_callback=None) -> dict:
     """
@@ -62,15 +96,26 @@ async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: 
         all_requests.update(homepage_requests)
         pages_scanned.append(url)
 
-        # Scan additional internal pages
+        # Scan additional internal pages, prioritizing product pages
         scanned_paths = {urlparse(url).path or '/'}
-        pages_to_scan = []
 
+        # Score and sort links by product page likelihood
+        scored_links = []
         for link in internal_links:
             path = urlparse(link).path or '/'
-            if path not in scanned_paths and len(pages_to_scan) < max_internal_pages:
-                pages_to_scan.append(link)
-                scanned_paths.add(path)
+            if path not in scanned_paths:
+                score = _score_product_likelihood(link)
+                scored_links.append((score, link, path))
+
+        # Sort by score descending, take top candidates
+        scored_links.sort(key=lambda x: x[0], reverse=True)
+
+        pages_to_scan = []
+        for score, link, path in scored_links:
+            if len(pages_to_scan) >= max_internal_pages:
+                break
+            pages_to_scan.append(link)
+            scanned_paths.add(path)
 
         for i, page_url in enumerate(pages_to_scan):
             status(f"Exploring page {i + 2} of {len(pages_to_scan) + 1}...")

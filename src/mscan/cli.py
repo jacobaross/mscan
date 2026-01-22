@@ -268,7 +268,7 @@ def cli():
 @cli.command()
 @click.argument('url')
 @click.option('--timeout', '-t', default=10, help='Seconds to wait for network activity per page')
-@click.option('--pages', '-p', default=3, help='Maximum internal pages to scan beyond homepage')
+@click.option('--pages', '-p', default=1, help='Maximum internal pages to scan beyond homepage')
 @click.option('--headless', is_flag=True, help='Run in headless mode (may be blocked by bot detection)')
 @click.option('--show-report', '-r', is_flag=True, help='Display full report in terminal after scan')
 def scan(url: str, timeout: int, pages: int, headless: bool, show_report: bool):
