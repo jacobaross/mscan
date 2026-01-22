@@ -105,7 +105,8 @@
         "domains": [
           "static.hotjar.com",
           "script.hotjar.com",
-          "vars.hotjar.com"
+          "vars.hotjar.com",
+          "content.hotjar.io"
         ],
         "url_patterns": [
           "hjid="
@@ -218,6 +219,20 @@
       }
     },
     {
+      "vendor_name": "The Trade Desk",
+      "category": "DSP",
+      "detection_rules": {
+        "domains": [
+          "js.adsrvr.org",
+          "match.adsrvr.org",
+          "insight.adsrvr.org"
+        ],
+        "url_patterns": [
+          "ttd_"
+        ]
+      }
+    },
+    {
       "vendor_name": "LS Direct",
       "category": "Direct Mail",
       "detection_rules": {
@@ -265,6 +280,18 @@
       }
     },
     {
+      "vendor_name": "Klaviyo",
+      "category": "Email",
+      "detection_rules": {
+        "domains": [
+          "static-forms.klaviyo.com",
+          "static-tracking.klaviyo.com",
+          "fast.a.klaviyo.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
       "vendor_name": "LiveIntent",
       "category": "ID & Data Infra",
       "detection_rules": {
@@ -289,6 +316,19 @@
       }
     },
     {
+      "vendor_name": "Shopify",
+      "category": "Other",
+      "detection_rules": {
+        "domains": [
+          "error-analytics-sessions-production.shopifysvc.com",
+          "monorail-edge.shopifysvc.com",
+          "pay.shopify.com",
+          "shop.app"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
       "vendor_name": "Applovin",
       "category": "Performance",
       "detection_rules": {
@@ -296,29 +336,6 @@
           "b.applovin.com",
           "res4.applovin.com",
           "re.applovin.com"
-        ],
-        "url_patterns": []
-      }
-    },
-    {
-      "vendor_name": "Klaviyo",
-      "category": "Email",
-      "detection_rules": {
-        "domains": [
-          "static-forms.klaviyo.com",
-          "static-tracking.klaviyo.com",
-          "fast.a.klaviyo.com"
-        ],
-        "url_patterns": []
-      }
-    },
-    {
-      "vendor_name": "Shopify",
-      "category": "Other",
-      "detection_rules": {
-        "domains": [
-          "error-analytics-sessions-production.shopifysvc.com",
-          "monorail-edge.shopifysvc.com"
         ],
         "url_patterns": []
       }
@@ -366,20 +383,6 @@
       }
     },
     {
-      "vendor_name": "The Trade Desk",
-      "category": "DSP",
-      "detection_rules": {
-        "domains": [
-          "js.adsrvr.org",
-          "match.adsrvr.org",
-          "insight.adsrvr.org"
-        ],
-        "url_patterns": [
-          "ttd_"
-        ]
-      }
-    },
-    {
       "vendor_name": "LinkedIn Insight Tag",
       "category": "Social Media",
       "detection_rules": {
@@ -391,6 +394,16 @@
         "url_patterns": [
           "partner_id="
         ]
+      }
+    },
+    {
+      "vendor_name": "Linkedin",
+      "category": "Social Media",
+      "detection_rules": {
+        "domains": [
+          "www.linkedin.com"
+        ],
+        "url_patterns": []
       }
     },
     {

@@ -1,6 +1,7 @@
 """CLI entry point for the Martech Scanner."""
 
 import json
+import shutil
 import subprocess
 import click
 from pathlib import Path
@@ -288,7 +289,8 @@ def prompt_for_category(console: Console, inline: bool = False) -> str:
 def add_vendors_batch(domains: list[dict], console: Console):
     """Batch workflow to add multiple vendors efficiently."""
     console.print()
-    console.print(f"[bold]Adding {len(domains)} vendors...[/bold]")
+    console.print(f"[bold]Adding {len(domains)} domain(s)...[/bold]")
+    console.print("[dim]Tip: Type an existing vendor name to append domains to it[/dim]")
     console.print()
 
     # Show category reference once
@@ -301,6 +303,11 @@ def add_vendors_batch(domains: list[dict], console: Console):
     console.print()
 
     new_vendors = []
+    appended_domains = []  # Track domains appended to existing vendors
+
+    # Load existing vendors for matching
+    existing_vendors = load_vendors()
+    vendor_name_map = {v['vendor_name'].lower(): v for v in existing_vendors}
 
     for i, domain_info in enumerate(domains, 1):
         domain = domain_info['domain']
@@ -310,6 +317,27 @@ def add_vendors_batch(domains: list[dict], console: Console):
 
         # Prompt for vendor name
         vendor_name = click.prompt("  Name", default=default_name)
+
+        # Check if this matches an existing vendor
+        existing_vendor = vendor_name_map.get(vendor_name.lower())
+        if existing_vendor:
+            # Ask to append
+            append = click.confirm(
+                f"  Found existing '{existing_vendor['vendor_name']}'. Append domain?",
+                default=True
+            )
+            if append:
+                appended_domains.append({
+                    'vendor': existing_vendor,
+                    'domains': domain_info['full_domains']
+                })
+                short_cat = CATEGORY_SHORT_NAMES.get(
+                    existing_vendor['category'],
+                    existing_vendor['category'].split(' and ')[0].split()[0]
+                )
+                console.print(f"  [green]✓[/green] Added to {existing_vendor['vendor_name']} ({short_cat})")
+                console.print()
+                continue
 
         # Prompt for category with option for new
         categories = get_categories_from_db()  # Refresh in case new one was added
@@ -335,24 +363,46 @@ def add_vendors_batch(domains: list[dict], console: Console):
         }
         new_vendors.append(new_vendor)
 
+        # Add to map so subsequent domains can reference it
+        vendor_name_map[vendor_name.lower()] = new_vendor
+
         # Show short category name
         short_cat = CATEGORY_SHORT_NAMES.get(category, category.split(' and ')[0].split()[0])
         console.print(f"  [green]✓[/green] {vendor_name} ({short_cat})")
         console.print()
 
-    # Save all at once
-    if new_vendors:
+    # Save all changes
+    if new_vendors or appended_domains:
         vendors_file = get_vendors_path()
         with open(vendors_file, 'r') as f:
             data = json.load(f)
 
+        # Add new vendors
         data['vendors'].extend(new_vendors)
+
+        # Append domains to existing vendors
+        for append_info in appended_domains:
+            for vendor in data['vendors']:
+                if vendor['vendor_name'] == append_info['vendor']['vendor_name']:
+                    # Add new domains, avoiding duplicates
+                    existing = set(vendor['detection_rules']['domains'])
+                    for new_domain in append_info['domains']:
+                        if new_domain not in existing:
+                            vendor['detection_rules']['domains'].append(new_domain)
+                    break
+
         data['vendors'].sort(key=lambda v: (v['category'], v['vendor_name']))
 
         with open(vendors_file, 'w') as f:
             json.dump(data, f, indent=2)
 
-        console.print(f"[green]Done! Added {len(new_vendors)} vendors to database.[/green]")
+        # Summary message
+        msgs = []
+        if new_vendors:
+            msgs.append(f"added {len(new_vendors)} new vendor(s)")
+        if appended_domains:
+            msgs.append(f"appended domains to {len(appended_domains)} existing vendor(s)")
+        console.print(f"[green]Done! {', '.join(msgs).capitalize()}.[/green]")
 
 
 @click.group()
@@ -421,9 +471,12 @@ def scan(url: str, timeout: int, pages: int, headless: bool, show_report: bool):
             console.print(f.read())
 
     # Interactive options
+    viewer = 'bat' if shutil.which('bat') else 'less'
+    viewer_name = 'bat' if viewer == 'bat' else 'pager'
+
     console.print()
     console.print("[bold]Options:[/bold]")
-    console.print("  [cyan]v[/cyan] - View report in nvim")
+    console.print(f"  [cyan]v[/cyan] - View report in {viewer_name}")
     if unknown_domains:
         console.print(f"  [cyan]u[/cyan] - View {len(unknown_domains)} unknown domains (potential new vendors)")
     console.print("  [cyan]Enter[/cyan] - Exit")
@@ -431,7 +484,7 @@ def scan(url: str, timeout: int, pages: int, headless: bool, show_report: bool):
     choice = click.prompt("Choice", default="", show_default=False)
 
     if choice.lower() == 'v':
-        subprocess.run(['nvim', report_path])
+        subprocess.run([viewer, report_path])
     elif choice.lower() == 'u' and unknown_domains:
         show_unknown_domains(unknown_domains, console)
 

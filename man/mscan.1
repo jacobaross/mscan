@@ -109,11 +109,13 @@ OneTrust, Cookiebot, TrustArc
 After a scan completes, mscan presents interactive options:
 .TP
 .B v
-Open the full report in nvim
+Open the full report in a pager (bat if installed, otherwise less)
 .TP
 .B u
 View unknown third-party domains detected during scan. From here, you can
-select domains to add as new vendors using a batch workflow.
+select domains to add as new vendors or append to existing vendors. When
+entering a vendor name, typing an existing vendor's name will prompt to
+append the domain to that vendor instead of creating a new one.
 .TP
 .B Enter
 Exit without additional action
