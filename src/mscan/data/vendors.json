@@ -316,6 +316,16 @@
       }
     },
     {
+      "vendor_name": "Tapad",
+      "category": "ID & Data Infra",
+      "detection_rules": {
+        "domains": [
+          "pixel.tapad.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
       "vendor_name": "Shopify",
       "category": "Other",
       "detection_rules": {
