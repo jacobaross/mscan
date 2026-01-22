@@ -2,10 +2,10 @@
 
 import asyncio
 from urllib.parse import urljoin, urlparse
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 
 
-async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: int = 3, headless: bool = False) -> dict:
+async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: int = 3, headless: bool = False, status_callback=None) -> dict:
     """
     Scan a website and capture all network requests.
 
@@ -18,9 +18,15 @@ async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: 
     Returns:
         Dictionary with scan results including all captured URLs and pages scanned
     """
+    def status(msg):
+        if status_callback:
+            status_callback(msg)
+
     all_requests = set()
     pages_scanned = []
     base_domain = urlparse(url).netloc.replace('www.', '')
+
+    status("Warming up the browser...")
 
     async with async_playwright() as p:
         # Default to headed mode to avoid bot detection
@@ -32,6 +38,9 @@ async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: 
                 '--no-sandbox',
             ]
         )
+
+        status("Putting on disguise...")
+
         context = await browser.new_context(
             user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             viewport={'width': 1920, 'height': 1080},
@@ -48,7 +57,8 @@ async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: 
         """)
 
         # Scan homepage first
-        homepage_requests, internal_links = await _scan_page(context, url, timeout_seconds, base_domain)
+        status("Visiting homepage...")
+        homepage_requests, internal_links = await _scan_page(context, url, timeout_seconds, base_domain, status)
         all_requests.update(homepage_requests)
         pages_scanned.append(url)
 
@@ -62,13 +72,14 @@ async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: 
                 pages_to_scan.append(link)
                 scanned_paths.add(path)
 
-        for page_url in pages_to_scan:
+        for i, page_url in enumerate(pages_to_scan):
+            status(f"Exploring page {i + 2} of {len(pages_to_scan) + 1}...")
             try:
-                page_requests, _ = await _scan_page(context, page_url, timeout_seconds, base_domain)
+                page_requests, _ = await _scan_page(context, page_url, timeout_seconds, base_domain, status)
                 all_requests.update(page_requests)
                 pages_scanned.append(page_url)
-            except Exception as e:
-                print(f"  Warning: Failed to scan {page_url}: {e}")
+            except Exception:
+                pass  # Silently skip failed pages
 
         await browser.close()
 
@@ -79,13 +90,17 @@ async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: 
     }
 
 
-async def _scan_page(context, url: str, timeout_seconds: int, base_domain: str) -> tuple[set, list]:
+async def _scan_page(context, url: str, timeout_seconds: int, base_domain: str, status_callback=None) -> tuple[set, list]:
     """
     Scan a single page and return captured requests and internal links.
 
     Returns:
         Tuple of (set of request URLs, list of internal links)
     """
+    def status(msg):
+        if status_callback:
+            status_callback(msg)
+
     captured_requests = set()
     internal_links = []
 
@@ -99,11 +114,18 @@ async def _scan_page(context, url: str, timeout_seconds: int, base_domain: str) 
 
     try:
         # Navigate to page and wait for network to settle
-        await page.goto(url, wait_until='networkidle', timeout=60000)
+        status("Waiting for page to load...")
+        try:
+            await page.goto(url, wait_until='networkidle', timeout=60000)
+        except PlaywrightTimeout:
+            # Timeout is fine - heavy sites never reach networkidle
+            status("Page still loading trackers... (continuing anyway)")
 
         # Additional wait for lazy-loaded scripts
+        status("Watching for sneaky trackers...")
         await asyncio.sleep(timeout_seconds)
 
+        status("Cataloging the surveillance...")
         # Extract internal links for further scanning
         links = await page.evaluate('''() => {
             const links = Array.from(document.querySelectorAll('a[href]'));
@@ -116,14 +138,18 @@ async def _scan_page(context, url: str, timeout_seconds: int, base_domain: str) 
             if link_domain == base_domain:
                 internal_links.append(link)
 
-    except Exception as e:
-        print(f"  Error loading page {url}: {e}")
+    except PlaywrightTimeout:
+        # Already handled above, but just in case
+        pass
+    except Exception:
+        # Silently handle other errors - we still got requests
+        pass
     finally:
         await page.close()
 
     return captured_requests, internal_links
 
 
-def scan_website_sync(url: str, timeout_seconds: int = 10, max_internal_pages: int = 3, headless: bool = False) -> dict:
+def scan_website_sync(url: str, timeout_seconds: int = 10, max_internal_pages: int = 3, headless: bool = False, status_callback=None) -> dict:
     """Synchronous wrapper for scan_website."""
-    return asyncio.run(scan_website(url, timeout_seconds, max_internal_pages, headless))
+    return asyncio.run(scan_website(url, timeout_seconds, max_internal_pages, headless, status_callback))

@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
+from rich.status import Status
 
 from mscan.scanner import scan_website_sync
 from mscan.fingerprints import match_vendors, load_vendors, get_vendors_path, find_unknown_domains
@@ -283,29 +284,35 @@ def scan(url: str, timeout: int, pages: int, headless: bool, show_report: bool):
     console.print(f"  Max pages: {pages + 1} (homepage + {pages} internal)")
     console.print()
 
-    # Phase 1: Scan website
-    console.print("[dim]Phase 1: Scanning website...[/dim]")
-    scan_results = scan_website_sync(url, timeout_seconds=timeout, max_internal_pages=pages, headless=headless)
+    # Phase 1: Scan website with live status updates
+    with console.status("[bold green]Starting scan...", spinner="dots") as status:
+        def update_status(msg):
+            status.update(f"[bold green]{msg}")
+
+        scan_results = scan_website_sync(
+            url,
+            timeout_seconds=timeout,
+            max_internal_pages=pages,
+            headless=headless,
+            status_callback=update_status
+        )
 
     pages_scanned = scan_results.get('pages_scanned', [])
     requests = scan_results.get('requests', [])
-    console.print(f"  Scanned {len(pages_scanned)} pages")
-    console.print(f"  Captured {len(requests)} network requests")
+    console.print(f"[green]✓[/green] Scanned {len(pages_scanned)} pages, captured {len(requests)} network requests")
 
     # Phase 2: Match vendors
-    console.print("[dim]Phase 2: Matching vendors...[/dim]")
     detected = match_vendors(requests)
-    console.print(f"  Detected {len(detected)} vendors")
+    console.print(f"[green]✓[/green] Matched {len(detected)} vendors from database")
 
     # Phase 3: Find unknown domains
-    console.print("[dim]Phase 3: Finding unknown domains...[/dim]")
     base_domain = extract_domain_name(url)
     unknown_domains = find_unknown_domains(requests, base_domain)
-    console.print(f"  Found {len(unknown_domains)} unknown third-party domains")
+    console.print(f"[green]✓[/green] Found {len(unknown_domains)} unknown third-party domains")
 
     # Phase 4: Generate report
-    console.print("[dim]Phase 4: Generating report...[/dim]")
     report_path = generate_report(scan_results, detected)
+    console.print(f"[green]✓[/green] Report generated")
 
     # Print insightful summary
     print_scan_summary(detected, url, report_path, console)
