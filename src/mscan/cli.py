@@ -798,5 +798,152 @@ def manage_categories():
                 console.print("  [red]Invalid category number[/red]")
 
 
+@cli.command('manage-vendors')
+@click.option('--category', '-c', default=None, help='Filter to specific category')
+def manage_vendors(category):
+    """Manage vendors - rename, delete, or move between categories."""
+    from rich.table import Table
+
+    console = Console()
+
+    while True:
+        vendors = load_vendors()
+
+        # Filter by category if specified
+        if category:
+            vendors = [v for v in vendors if category.lower() in v['category'].lower()]
+            if not vendors:
+                console.print(f"[red]No vendors found in category matching '{category}'[/red]")
+                return
+
+        # Group by category for display
+        by_category = {}
+        for v in vendors:
+            cat = v['category']
+            if cat not in by_category:
+                by_category[cat] = []
+            by_category[cat].append(v)
+
+        categories = get_categories_from_db()
+        sorted_cats = [c for c in categories if c in by_category]
+
+        console.print("\n[bold]Vendors in database:[/bold]\n")
+
+        # Build flat list with indices
+        vendor_list = []
+        for cat in sorted_cats:
+            console.print(f"[cyan]{cat}[/cyan]")
+            for v in sorted(by_category[cat], key=lambda x: x['vendor_name']):
+                vendor_list.append(v)
+                idx = len(vendor_list)
+                domains = v.get('detection_rules', {}).get('domains', [])
+                domain_str = domains[0] if domains else '-'
+                if len(domains) > 1:
+                    domain_str += f" (+{len(domains)-1})"
+                console.print(f"  [dim]{idx:3}.[/dim] {v['vendor_name']} [dim]({domain_str})[/dim]")
+            console.print()
+
+        console.print(f"[dim]Total: {len(vendor_list)} vendors[/dim]")
+
+        console.print("\n[bold]Options:[/bold]")
+        console.print("  [cyan]r[/cyan] - Rename a vendor")
+        console.print("  [cyan]m[/cyan] - Move vendor to different category")
+        console.print("  [cyan]d[/cyan] - Delete a vendor")
+        console.print("  [cyan]Enter[/cyan] - Exit")
+
+        choice = click.prompt("Choice", default="", show_default=False)
+
+        if not choice.strip():
+            break
+
+        if choice.lower() == 'r':
+            # Rename vendor
+            vendor_num = click.prompt("Vendor number to rename", type=int)
+            if 1 <= vendor_num <= len(vendor_list):
+                vendor = vendor_list[vendor_num - 1]
+                old_name = vendor['vendor_name']
+                console.print(f"  Current name: [cyan]{old_name}[/cyan]")
+                new_name = click.prompt("  New name", default=old_name)
+
+                if new_name.strip() and new_name.strip() != old_name:
+                    vendors_file = get_vendors_path()
+                    with open(vendors_file, 'r') as f:
+                        data = json.load(f)
+
+                    for v in data['vendors']:
+                        if v['vendor_name'] == old_name and v['category'] == vendor['category']:
+                            v['vendor_name'] = new_name.strip()
+                            break
+
+                    data['vendors'].sort(key=lambda v: (v['category'], v['vendor_name']))
+
+                    with open(vendors_file, 'w') as f:
+                        json.dump(data, f, indent=2)
+
+                    console.print(f"  [green]✓[/green] Renamed '{old_name}' → '{new_name.strip()}'")
+                else:
+                    console.print("  [yellow]No change[/yellow]")
+            else:
+                console.print("  [red]Invalid vendor number[/red]")
+
+        elif choice.lower() == 'm':
+            # Move vendor to different category
+            vendor_num = click.prompt("Vendor number to move", type=int)
+            if 1 <= vendor_num <= len(vendor_list):
+                vendor = vendor_list[vendor_num - 1]
+                old_cat = vendor['category']
+                console.print(f"  Vendor: [cyan]{vendor['vendor_name']}[/cyan]")
+                console.print(f"  Current category: [dim]{old_cat}[/dim]")
+
+                new_cat = prompt_for_category(console, inline=False)
+
+                if new_cat != old_cat:
+                    vendors_file = get_vendors_path()
+                    with open(vendors_file, 'r') as f:
+                        data = json.load(f)
+
+                    for v in data['vendors']:
+                        if v['vendor_name'] == vendor['vendor_name'] and v['category'] == old_cat:
+                            v['category'] = new_cat
+                            break
+
+                    data['vendors'].sort(key=lambda v: (v['category'], v['vendor_name']))
+
+                    with open(vendors_file, 'w') as f:
+                        json.dump(data, f, indent=2)
+
+                    console.print(f"  [green]✓[/green] Moved '{vendor['vendor_name']}' to '{new_cat}'")
+                else:
+                    console.print("  [yellow]No change[/yellow]")
+            else:
+                console.print("  [red]Invalid vendor number[/red]")
+
+        elif choice.lower() == 'd':
+            # Delete vendor
+            vendor_num = click.prompt("Vendor number to delete", type=int)
+            if 1 <= vendor_num <= len(vendor_list):
+                vendor = vendor_list[vendor_num - 1]
+                console.print(f"  Vendor: [cyan]{vendor['vendor_name']}[/cyan] ({vendor['category']})")
+
+                if click.confirm("  Are you sure you want to delete this vendor?", default=False):
+                    vendors_file = get_vendors_path()
+                    with open(vendors_file, 'r') as f:
+                        data = json.load(f)
+
+                    data['vendors'] = [
+                        v for v in data['vendors']
+                        if not (v['vendor_name'] == vendor['vendor_name'] and v['category'] == vendor['category'])
+                    ]
+
+                    with open(vendors_file, 'w') as f:
+                        json.dump(data, f, indent=2)
+
+                    console.print(f"  [green]✓[/green] Deleted '{vendor['vendor_name']}'")
+                else:
+                    console.print("  [yellow]Cancelled[/yellow]")
+            else:
+                console.print("  [red]Invalid vendor number[/red]")
+
+
 if __name__ == '__main__':
     cli()

@@ -40,6 +40,10 @@ When selecting a category, enter 0 to create a new category.
 .B manage-categories
 Manage vendor categories. Provides interactive options to rename existing
 categories or delete empty ones.
+.TP
+.B manage-vendors
+Manage individual vendors. Provides interactive options to rename vendors,
+move them between categories, or delete them.
 .SH OPTIONS
 .SS "scan options"
 .TP
@@ -71,6 +75,10 @@ Vendor category. If not provided, will prompt interactively.
 .TP
 .BR \-t ", " \-\-timeout " " \fISECONDS\fR
 Seconds to wait for network activity when scanning sample site. Default: 10.
+.SS "manage-vendors options"
+.TP
+.BR \-c ", " \-\-category " " \fICATEGORY\fR
+Filter to vendors in a specific category (partial match supported).
 .SH CATEGORIES
 Vendors are organized into the following categories:
 .TP
