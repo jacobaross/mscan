@@ -10,6 +10,9 @@ pip install -e .
 
 # Install Playwright browser
 playwright install chromium
+
+# Optional: Install man page
+sudo cp man/mscan.1 /usr/local/share/man/man1/
 ```
 
 ## Usage
@@ -40,3 +43,13 @@ mscan add-vendor "Vendor Name" -s sample-site.com
 Scan results are saved to `./reports/` as plain text files with:
 - Summary of detected vendors by category
 - Full vendor table showing which vendors were detected
+
+## Documentation
+
+Full documentation is available via man page:
+
+```bash
+man mscan
+```
+
+Or view directly: `man man/mscan.1`

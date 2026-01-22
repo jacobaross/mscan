@@ -20,3 +20,9 @@ mscan = "mscan.cli:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mscan"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/man",
+]

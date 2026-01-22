@@ -1,0 +1,160 @@
+.TH MSCAN 1 "January 2026" "mscan 0.1.0" "User Commands"
+.SH NAME
+mscan \- martech intelligence scanner for detecting marketing technology on websites
+.SH SYNOPSIS
+.B mscan
+.RI [ command ]
+.RI [ options ]
+.RI [ arguments ]
+.SH DESCRIPTION
+.B mscan
+is a command-line tool that scans websites to identify their marketing and advertising
+technology stack. It uses a headless browser to capture network requests and matches
+them against a fingerprint database of known martech vendors.
+.PP
+The scanner provides actionable intelligence including:
+.IP \(bu 2
+Detection of known martech vendors by category
+.IP \(bu 2
+Competitive analysis for Direct Mail and CTV vendors
+.IP \(bu 2
+Discovery of unknown third-party domains
+.IP \(bu 2
+Interactive vendor database management
+.SH COMMANDS
+.TP
+.B scan \fIURL\fR
+Scan a website for martech vendors. URL can be a domain (example.com) or full URL
+(https://example.com). After scanning, displays findings grouped by category with
+actionable takeaways.
+.TP
+.B list-vendors
+List all vendors in the fingerprint database with their detection rules, grouped
+by category.
+.TP
+.B add-vendor \fINAME\fR \-s \fISAMPLE_URL\fR
+Add a new vendor to the database by scanning a sample website known to use that
+vendor. Interactively guides through domain selection and categorization.
+.SH OPTIONS
+.SS "scan options"
+.TP
+.BR \-t ", " \-\-timeout " " \fISECONDS\fR
+Seconds to wait for network activity per page. Default: 10. Lower values scan
+faster but may miss lazy-loaded trackers.
+.TP
+.BR \-p ", " \-\-pages " " \fINUM\fR
+Maximum internal pages to scan beyond homepage. Default: 1. The scanner
+prioritizes product pages when selecting which pages to scan.
+.TP
+.B \-\-headless
+Run browser in headless mode. May be blocked by bot detection on some sites.
+Default is headed mode for better compatibility.
+.TP
+.BR \-r ", " \-\-show\-report
+Display the full text report in terminal after scan completes.
+.SS "list-vendors options"
+.TP
+.BR \-c ", " \-\-category " " \fICATEGORY\fR
+Filter vendors by category name (partial match supported).
+.SS "add-vendor options"
+.TP
+.BR \-s ", " \-\-sample\-url " " \fIURL\fR
+(Required) URL of a website known to use the vendor being added.
+.TP
+.BR \-c ", " \-\-category " " \fICATEGORY\fR
+Vendor category. If not provided, will prompt interactively.
+.TP
+.BR \-t ", " \-\-timeout " " \fISECONDS\fR
+Seconds to wait for network activity when scanning sample site. Default: 10.
+.SH CATEGORIES
+Vendors are organized into the following categories:
+.TP
+.B Direct Mail and Offline Attribution
+PebblePost, Postie, LS Direct, Postpilot
+.TP
+.B CTV and Streaming Attribution
+MNTN/Steelhouse, Tatari, Innovid, Teads
+.TP
+.B Social Media Advertising
+Meta Pixel, TikTok Pixel, Pinterest Tag, Snapchat Pixel, X/Twitter Pixel, LinkedIn
+.TP
+.B Search and Display Advertising
+Google Ads, Microsoft/Bing Ads, Criteo, The Trade Desk
+.TP
+.B Affiliate and Performance Marketing
+CJ Affiliate, Impact, Rakuten Advertising
+.TP
+.B Analytics and Experimentation
+Google Analytics, Amplitude, Heap, Hotjar, FullStory, Quantum Metric
+.TP
+.B Identity and Data Infrastructure
+LiveRamp, LiveIntent
+.TP
+.B Consent Management
+OneTrust, Cookiebot, TrustArc
+.SH INTERACTIVE MODE
+After a scan completes, mscan presents interactive options:
+.TP
+.B v
+Open the full report in nvim
+.TP
+.B u
+View unknown third-party domains detected during scan. From here, you can
+select domains to add as new vendors using a batch workflow.
+.TP
+.B Enter
+Exit without additional action
+.SH EXAMPLES
+.TP
+Scan a website with default settings:
+.B mscan scan nike.com
+.TP
+Quick scan with shorter timeout:
+.B mscan scan target.com \-t 5 \-p 0
+.TP
+Scan multiple pages:
+.B mscan scan bestbuy.com \-p 3
+.TP
+List all vendors in the database:
+.B mscan list-vendors
+.TP
+List only analytics vendors:
+.B mscan list-vendors \-c analytics
+.TP
+Add a new vendor:
+.B mscan add-vendor "Acme Analytics" \-s example.com
+.SH FILES
+.TP
+.I ~/.local/share/mscan/reports/
+Directory where scan reports are saved (domain-YYYYMMDD-HHMMSS.txt)
+.TP
+.I <package>/data/vendors.json
+Vendor fingerprint database bundled with the package
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+Error (network failure, invalid URL, etc.)
+.SH ENVIRONMENT
+.TP
+.B DISPLAY
+Required for headed browser mode (default). Not needed if using \-\-headless.
+.SH NOTES
+The scanner runs a real browser (Chromium via Playwright) to capture network
+requests. This allows detection of JavaScript-loaded trackers that wouldn't
+appear in static HTML analysis.
+.PP
+Retail and e-commerce sites are common targets. The scanner prioritizes
+scanning product pages since these often have additional tracking for
+conversion attribution.
+.PP
+Direct Mail and CTV categories are highlighted as "competitive" in the
+takeaways section, useful for sales prospecting.
+.SH BUGS
+Report bugs at: https://github.com/jro/mscan/issues
+.SH AUTHOR
+Written with assistance from Claude Code.
+.SH SEE ALSO
+.BR playwright (1)
