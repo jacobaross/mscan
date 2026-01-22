@@ -144,7 +144,7 @@
       }
     },
     {
-      "vendor_name": "MNTN/Steelhouse",
+      "vendor_name": "MNTN/SHOU",
       "category": "CTV",
       "detection_rules": {
         "domains": [
@@ -290,7 +290,7 @@
     },
     {
       "vendor_name": "Applovin",
-      "category": "Other",
+      "category": "Performance",
       "detection_rules": {
         "domains": [
           "b.applovin.com",
@@ -302,7 +302,7 @@
     },
     {
       "vendor_name": "Klaviyo",
-      "category": "Other",
+      "category": "Email",
       "detection_rules": {
         "domains": [
           "static-forms.klaviyo.com",
@@ -325,7 +325,7 @@
     },
     {
       "vendor_name": "Criteo",
-      "category": "Search",
+      "category": "Performance",
       "detection_rules": {
         "domains": [
           "static.criteo.net",
@@ -353,7 +353,7 @@
       }
     },
     {
-      "vendor_name": "Microsoft/Bing Ads",
+      "vendor_name": "MSFT/Bing",
       "category": "Search",
       "detection_rules": {
         "domains": [
@@ -367,7 +367,7 @@
     },
     {
       "vendor_name": "The Trade Desk",
-      "category": "Search",
+      "category": "DSP",
       "detection_rules": {
         "domains": [
           "js.adsrvr.org",
