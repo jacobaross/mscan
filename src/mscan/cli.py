@@ -184,26 +184,37 @@ def show_unknown_domains(unknown_domains: list[dict], console: Console):
         console.print(f"[dim]...and {len(unknown_domains) - 20} more[/dim]")
 
     console.print()
-    console.print("[bold]Add a vendor?[/bold] Enter number to add, or press Enter to exit:")
+    console.print("[bold]Add vendors?[/bold] Enter numbers (e.g., 1,3,5 or 1 3 5), or press Enter to exit:")
     selection = click.prompt("Selection", default="", show_default=False)
 
-    if selection.isdigit():
-        idx = int(selection) - 1
-        if 0 <= idx < len(top_domains):
-            selected = top_domains[idx]
-            add_vendor_quick(selected, console)
+    if not selection.strip():
+        return
+
+    # Parse selection - support "1,3,5" or "1 3 5" or "1, 3, 5"
+    selection = selection.replace(',', ' ')
+    selected_indices = []
+    for part in selection.split():
+        if part.isdigit():
+            idx = int(part) - 1
+            if 0 <= idx < len(top_domains):
+                selected_indices.append(idx)
+
+    if selected_indices:
+        selected_domains = [top_domains[i] for i in selected_indices]
+        add_vendors_batch(selected_domains, console)
 
 
-def add_vendor_quick(domain_info: dict, console: Console):
-    """Quick workflow to add a new vendor from an unknown domain."""
-    console.print()
-    console.print(f"[bold]Adding vendor for domain:[/bold] {domain_info['domain']}")
-    console.print()
+def _smart_vendor_name(domain: str) -> str:
+    """Generate a smart default vendor name from domain."""
+    # Get first part of domain: somevendor.io -> somevendor
+    name = domain.split('.')[0]
+    # Handle hyphens: ad-track -> Ad Track
+    name = ' '.join(word.title() for word in name.split('-'))
+    return name
 
-    # Prompt for vendor name
-    vendor_name = click.prompt("Vendor name", default=domain_info['domain'].split('.')[0].title())
 
-    # Show category options
+def add_vendors_batch(domains: list[dict], console: Console):
+    """Batch workflow to add multiple vendors efficiently."""
     categories = [
         'Direct Mail and Offline Attribution',
         'CTV and Streaming Attribution',
@@ -217,46 +228,60 @@ def add_vendor_quick(domain_info: dict, console: Console):
     ]
 
     console.print()
-    console.print("[bold]Select category:[/bold]")
-    for i, cat in enumerate(categories, 1):
-        console.print(f"  {i}. {cat}")
-
-    cat_choice = click.prompt("Category number", type=int, default=9)
-    if 1 <= cat_choice <= len(categories):
-        category = categories[cat_choice - 1]
-    else:
-        category = 'Other/Uncategorized'
-
-    # Create vendor entry
-    new_vendor = {
-        "vendor_name": vendor_name,
-        "category": category,
-        "detection_rules": {
-            "domains": domain_info['full_domains'],
-            "url_patterns": []
-        }
-    }
-
-    # Show summary
+    console.print(f"[bold]Adding {len(domains)} vendors...[/bold]")
     console.print()
-    console.print("[bold]New vendor entry:[/bold]")
-    console.print(json.dumps(new_vendor, indent=2))
 
-    # Confirm
-    if click.confirm("\nAdd this vendor to the database?", default=True):
+    # Show category reference once
+    console.print("[dim]Categories: 1=Direct Mail, 2=CTV, 3=Social, 4=Search/Display, 5=Affiliate, 6=Analytics, 7=Identity, 8=Consent, 9=Other[/dim]")
+    console.print()
+
+    new_vendors = []
+
+    for i, domain_info in enumerate(domains, 1):
+        domain = domain_info['domain']
+        default_name = _smart_vendor_name(domain)
+
+        console.print(f"[cyan][{i}/{len(domains)}][/cyan] [bold]{domain}[/bold]")
+
+        # Prompt for vendor name
+        vendor_name = click.prompt("  Name", default=default_name)
+
+        # Prompt for category (inline)
+        cat_choice = click.prompt("  Category (1-9)", type=int, default=9)
+        if 1 <= cat_choice <= len(categories):
+            category = categories[cat_choice - 1]
+        else:
+            category = 'Other/Uncategorized'
+
+        # Create vendor entry
+        new_vendor = {
+            "vendor_name": vendor_name,
+            "category": category,
+            "detection_rules": {
+                "domains": domain_info['full_domains'],
+                "url_patterns": []
+            }
+        }
+        new_vendors.append(new_vendor)
+
+        # Show short category name
+        short_cat = category.split(' and ')[0].split(' ')[0]  # "Direct Mail and..." -> "Direct"
+        console.print(f"  [green]✓[/green] {vendor_name} ({short_cat})")
+        console.print()
+
+    # Save all at once
+    if new_vendors:
         vendors_file = get_vendors_path()
         with open(vendors_file, 'r') as f:
             data = json.load(f)
 
-        data['vendors'].append(new_vendor)
+        data['vendors'].extend(new_vendors)
         data['vendors'].sort(key=lambda v: (v['category'], v['vendor_name']))
 
         with open(vendors_file, 'w') as f:
             json.dump(data, f, indent=2)
 
-        console.print(f"\n[green]Successfully added '{vendor_name}' to vendors.json[/green]")
-    else:
-        console.print("[yellow]Cancelled[/yellow]")
+        console.print(f"[green]Done! Added {len(new_vendors)} vendors to database.[/green]")
 
 
 @click.group()
