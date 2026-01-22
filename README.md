@@ -1,16 +1,12 @@
 # mscan
 
 ```
-        .━━━━━━━.
-       ╱    ◉    ╲
-      │    ╱ ╲    │
-      │   ╱ m ╲   │       Watching for sneaky trackers...
-       ╲ ╱━━━━━╲ ╱        Cataloging the surveillance...
-        '━━━┳━━━'
-            ┃
-            ┃
-           ╱
-          ╱
+╔═══════════════════════╗
+║   ❯ scanning...       ║
+║   ▰▰▰▰▰▰▰▱▱▱  78%     ║    mscan
+║                       ║    Martech Intelligence Scanner
+║   «G» «META» «PBL»    ║
+╚═══════════════════════╝
 ```
 
 **Martech Intelligence Scanner** — CLI tool that scans websites and exposes their marketing/advertising technology stack by sniffing network requests and matching them against a fingerprint database.
@@ -70,7 +66,7 @@ TAKEAWAY
 Report saved: ./reports/nike-20260122-143022.txt
 
 Options:
-  v - View report in bat
+  v - View full report
   u - View 12 unknown domains (potential new vendors)
   Enter - Exit
 ```
@@ -91,6 +87,7 @@ Options:
 -t, --timeout SECONDS   # Wait time per page (default: 10)
 -p, --pages NUM         # Internal pages to scan beyond homepage (default: 1)
 --headless              # Run browser in headless mode
+-s, --system-browser    # Use system Chromium (bypasses Akamai/bot detection)
 -r, --show-report       # Print full report to terminal
 ```
 
@@ -99,14 +96,19 @@ Options:
 | Category | Examples |
 |----------|----------|
 | Direct Mail | PebblePost, Postie, LS Direct, Postpilot |
-| CTV | MNTN, Tatari, Innovid, Teads |
-| Social Media | Meta Pixel, TikTok, Pinterest, Snapchat, LinkedIn |
+| CTV | MNTN, Tatari, Innovid, Teads, Tvsquared |
+| Social Media | Meta Pixel, TikTok, Pinterest, Snapchat, LinkedIn, X/Twitter |
 | Search | Google Ads, Microsoft/Bing |
-| Analytics | Google Analytics, Amplitude, Heap, Hotjar, FullStory |
+| Performance | Criteo, Taboola, Applovin |
+| Analytics | Google Analytics, Amplitude, Heap, Hotjar, FullStory, Quantum Metric |
 | Affiliate | CJ Affiliate, Impact, Rakuten |
-| DSP | The Trade Desk |
+| DSP | The Trade Desk, Adform |
+| SSP | Pubmatic |
+| CDP | Segment, Demdex |
+| Email | Klaviyo, Bluecore |
+| Identity | LiveRamp, LiveIntent, Tapad |
 | Consent | OneTrust, Cookiebot, TrustArc |
-| Identity | LiveRamp, LiveIntent |
+| Other | Shopify |
 
 ## Adding New Vendors
 
