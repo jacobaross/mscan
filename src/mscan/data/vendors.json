@@ -124,6 +124,16 @@
       }
     },
     {
+      "vendor_name": "Innovid",
+      "category": "CTV and Streaming Attribution",
+      "detection_rules": {
+        "domains": [
+          "rtr.innovid.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
       "vendor_name": "MNTN/Steelhouse",
       "category": "CTV and Streaming Attribution",
       "detection_rules": {

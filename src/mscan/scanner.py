@@ -121,9 +121,17 @@ async def _scan_page(context, url: str, timeout_seconds: int, base_domain: str, 
             # Timeout is fine - heavy sites never reach networkidle
             status("Page still loading trackers... (continuing anyway)")
 
-        # Additional wait for lazy-loaded scripts
-        status("Watching for sneaky trackers...")
-        await asyncio.sleep(timeout_seconds)
+        # Additional wait for lazy-loaded scripts with periodic status updates
+        wait_messages = [
+            "Watching for sneaky trackers",
+            "Waiting for lazy scripts",
+            "Catching stragglers",
+            "Almost done with this page",
+        ]
+        for i in range(timeout_seconds):
+            msg_idx = min(i // 3, len(wait_messages) - 1)  # Change message every 3 seconds
+            status(f"{wait_messages[msg_idx]}... ({len(captured_requests)} requests)")
+            await asyncio.sleep(1)
 
         status("Cataloging the surveillance...")
         # Extract internal links for further scanning
