@@ -3,10 +3,32 @@
 import json
 import click
 from pathlib import Path
+from urllib.parse import urlparse
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 from mscan.scanner import scan_website_sync
 from mscan.fingerprints import match_vendors, load_vendors, get_vendors_path
 from mscan.report import generate_report
+
+# Competitive categories - these get special attention in takeaways
+COMPETITIVE_CATEGORIES = [
+    'Direct Mail and Offline Attribution',
+    'CTV and Streaming Attribution',
+]
+
+CATEGORY_SHORT_NAMES = {
+    'Direct Mail and Offline Attribution': 'Direct Mail',
+    'CTV and Streaming Attribution': 'CTV',
+    'Social Media Advertising': 'Social',
+    'Search and Display Advertising': 'Search/Display',
+    'Affiliate and Performance Marketing': 'Affiliate',
+    'Analytics and Experimentation': 'Analytics',
+    'Identity and Data Infrastructure': 'Identity',
+    'Consent Management': 'Consent',
+}
 
 
 def normalize_url(url: str) -> str:
@@ -14,6 +36,119 @@ def normalize_url(url: str) -> str:
     if not url.startswith(('http://', 'https://')):
         url = f'https://{url}'
     return url
+
+
+def extract_domain_name(url: str) -> str:
+    """Extract clean domain name from URL."""
+    parsed = urlparse(url)
+    domain = parsed.netloc or parsed.path
+    return domain.replace('www.', '')
+
+
+def print_scan_summary(detected: list[dict], url: str, report_path: str, console: Console):
+    """Print an insightful summary of scan results with actionable takeaways."""
+    domain = extract_domain_name(url)
+    all_vendors = load_vendors()
+    total_in_db = len(all_vendors)
+
+    # Group detected vendors by category
+    by_category = {}
+    for vendor in detected:
+        cat = vendor['category']
+        if cat not in by_category:
+            by_category[cat] = []
+        by_category[cat].append(vendor)
+
+    # Build the summary text
+    console.print()
+    console.rule(f"[bold]SCAN COMPLETE: {domain.upper()}[/bold]", style="cyan")
+    console.print()
+
+    # === FINDINGS ===
+    console.print("[bold]FINDINGS[/bold]")
+
+    if not detected:
+        console.print("  [dim]No martech vendors detected from the fingerprint database.[/dim]")
+        console.print("  [dim]Site may use unlisted vendors or block tracking scripts.[/dim]")
+    else:
+        # Show findings by category (prioritize competitive categories)
+        category_order = [
+            'Direct Mail and Offline Attribution',
+            'CTV and Streaming Attribution',
+            'Social Media Advertising',
+            'Search and Display Advertising',
+            'Affiliate and Performance Marketing',
+            'Analytics and Experimentation',
+            'Identity and Data Infrastructure',
+            'Consent Management',
+        ]
+
+        for cat in category_order:
+            if cat in by_category:
+                short_name = CATEGORY_SHORT_NAMES.get(cat, cat)
+                vendors = by_category[cat]
+                vendor_names = [v['vendor_name'] for v in vendors]
+
+                # Add details if available
+                details = [v['details'] for v in vendors if v.get('details')]
+                detail_str = f" [dim]({details[0]})[/dim]" if details else ""
+
+                # Count indicator for multiple vendors
+                count_str = f" [dim]({len(vendors)} vendors)[/dim]" if len(vendors) > 1 else ""
+
+                # Highlight competitive categories
+                if cat in COMPETITIVE_CATEGORIES:
+                    console.print(f"  [yellow]{short_name}:[/yellow] {', '.join(vendor_names)}{detail_str}{count_str}")
+                else:
+                    console.print(f"  [white]{short_name}:[/white] {', '.join(vendor_names)}{detail_str}{count_str}")
+
+        # Stats line
+        console.print()
+        console.print(f"  [dim]Categories: {len(by_category)} of 8  |  Vendors: {len(detected)} of {total_in_db} in database[/dim]")
+
+    # === TAKEAWAY ===
+    console.print()
+    console.print("[bold]TAKEAWAY[/bold]")
+
+    takeaways = []
+
+    # Check Direct Mail (competitive)
+    dm_cat = 'Direct Mail and Offline Attribution'
+    if dm_cat in by_category:
+        dm_vendors = [v['vendor_name'] for v in by_category[dm_cat]]
+        takeaways.append(f"[yellow]Competitor alert:[/yellow] Using {', '.join(dm_vendors)} for direct mail")
+    else:
+        takeaways.append("[green]No direct mail vendor[/green] - potential prospect")
+
+    # Check CTV (competitive)
+    ctv_cat = 'CTV and Streaming Attribution'
+    if ctv_cat in by_category:
+        ctv_vendors = [v['vendor_name'] for v in by_category[ctv_cat]]
+        takeaways.append(f"[yellow]Competitor alert:[/yellow] Using {', '.join(ctv_vendors)} for CTV")
+    else:
+        takeaways.append("[green]No CTV vendor[/green] - potential prospect")
+
+    # Social stack assessment
+    social_cat = 'Social Media Advertising'
+    if social_cat in by_category:
+        social_count = len(by_category[social_cat])
+        if social_count >= 3:
+            takeaways.append(f"Heavy social presence ({social_count} platforms) - likely D2C brand")
+
+    # Stack sophistication
+    if len(detected) == 0:
+        takeaways.append("No detectable martech stack")
+    elif len(detected) <= 2:
+        takeaways.append("Basic martech stack - may be early-stage or privacy-focused")
+    elif len(detected) >= 8:
+        takeaways.append("Sophisticated martech stack - mature marketing operation")
+
+    for takeaway in takeaways:
+        console.print(f"  → {takeaway}")
+
+    # === REPORT ===
+    console.print()
+    console.print(f"[dim]Report saved: {report_path}[/dim]")
 
 
 @click.group()
@@ -27,48 +162,47 @@ def cli():
 @click.option('--timeout', '-t', default=10, help='Seconds to wait for network activity per page')
 @click.option('--pages', '-p', default=3, help='Maximum internal pages to scan beyond homepage')
 @click.option('--headless', is_flag=True, help='Run in headless mode (may be blocked by bot detection)')
-def scan(url: str, timeout: int, pages: int, headless: bool):
+@click.option('--show-report', '-r', is_flag=True, help='Display full report in terminal after scan')
+def scan(url: str, timeout: int, pages: int, headless: bool, show_report: bool):
     """Scan a website for martech vendors.
 
     URL can be a domain (example.com) or full URL (https://example.com)
     """
+    console = Console()
     url = normalize_url(url)
 
-    click.echo(f"Scanning {url}...")
-    click.echo(f"  Timeout: {timeout}s per page")
-    click.echo(f"  Max pages: {pages + 1} (homepage + {pages} internal)")
-    click.echo()
+    console.print(f"[bold]Scanning {url}...[/bold]")
+    console.print(f"  Timeout: {timeout}s per page")
+    console.print(f"  Max pages: {pages + 1} (homepage + {pages} internal)")
+    console.print()
 
     # Phase 1: Scan website
-    click.echo("Phase 1: Scanning website...")
+    console.print("[dim]Phase 1: Scanning website...[/dim]")
     scan_results = scan_website_sync(url, timeout_seconds=timeout, max_internal_pages=pages, headless=headless)
 
     pages_scanned = scan_results.get('pages_scanned', [])
     requests = scan_results.get('requests', [])
-    click.echo(f"  Scanned {len(pages_scanned)} pages")
-    click.echo(f"  Captured {len(requests)} network requests")
-    click.echo()
+    console.print(f"  Scanned {len(pages_scanned)} pages")
+    console.print(f"  Captured {len(requests)} network requests")
 
     # Phase 2: Match vendors
-    click.echo("Phase 2: Matching vendors...")
+    console.print("[dim]Phase 2: Matching vendors...[/dim]")
     detected = match_vendors(requests)
-    click.echo(f"  Detected {len(detected)} vendors")
-    click.echo()
+    console.print(f"  Detected {len(detected)} vendors")
 
     # Phase 3: Generate report
-    click.echo("Phase 3: Generating report...")
+    console.print("[dim]Phase 3: Generating report...[/dim]")
     report_path = generate_report(scan_results, detected)
-    click.echo(f"  Report saved to: {report_path}")
-    click.echo()
 
-    # Summary
-    if detected:
-        click.echo("Detected vendors:")
-        for vendor in detected:
-            details = f" ({vendor['details']})" if vendor.get('details') else ""
-            click.echo(f"  - {vendor['vendor_name']}{details}")
-    else:
-        click.echo("No vendors detected from the fingerprint database.")
+    # Print insightful summary
+    print_scan_summary(detected, url, report_path, console)
+
+    # Show full report if requested
+    if show_report:
+        console.print()
+        console.rule("[bold]FULL REPORT[/bold]", style="cyan")
+        with open(report_path, 'r') as f:
+            console.print(f.read())
 
 
 @cli.command('list-vendors')
