@@ -91,14 +91,13 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
                 vendors = by_category[cat]
                 vendor_names = [v['vendor_name'] for v in vendors]
 
-                # Count indicator for multiple vendors
-                count_str = f" [dim]({len(vendors)} vendors)[/dim]" if len(vendors) > 1 else ""
+                count_prefix = f"[{len(vendors)}]"
 
                 # Highlight competitive categories
                 if cat in COMPETITIVE_CATEGORIES:
-                    console.print(f"  [yellow]{short_name}:[/yellow] {', '.join(vendor_names)}{count_str}")
+                    console.print(f"  [yellow]{count_prefix} {short_name}:[/yellow] {', '.join(vendor_names)}")
                 else:
-                    console.print(f"  [white]{short_name}:[/white] {', '.join(vendor_names)}{count_str}")
+                    console.print(f"  [dim]{count_prefix}[/dim] [white]{short_name}:[/white] {', '.join(vendor_names)}")
 
         # Stats line
         console.print()
