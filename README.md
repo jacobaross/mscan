@@ -25,13 +25,23 @@ Perfect for competitive analysis, sales prospecting, or just satisfying your cur
 
 ## Installation
 
+Requires Python 3.10+
+
+**macOS**
 ```bash
-# Clone and install
+git clone https://github.com/jacobaross/mscan.git
+cd mscan
+python3 -m venv venv
+source venv/bin/activate
+pip install -e .
+playwright install chromium
+```
+
+**Linux**
+```bash
 git clone https://github.com/jacobaross/mscan.git
 cd mscan
 pip install -e .
-
-# Install browser
 playwright install chromium
 ```
 
