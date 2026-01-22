@@ -731,6 +731,7 @@ def manage_categories():
         console.print(table)
 
         console.print("\n[bold]Options:[/bold]")
+        console.print("  [cyan]a[/cyan] - Add a new category")
         console.print("  [cyan]r[/cyan] - Rename a category")
         console.print("  [cyan]d[/cyan] - Delete empty category")
         console.print("  [cyan]Enter[/cyan] - Exit")
@@ -740,7 +741,21 @@ def manage_categories():
         if not choice.strip():
             break
 
-        if choice.lower() == 'r':
+        if choice.lower() == 'a':
+            # Add new category
+            new_cat = click.prompt("  New category name")
+            if new_cat.strip():
+                new_cat = new_cat.strip()
+                if new_cat in categories:
+                    console.print(f"  [yellow]Category '{new_cat}' already exists[/yellow]")
+                else:
+                    categories.append(new_cat)
+                    cat_counts[new_cat] = 0
+                    console.print(f"  [green]✓[/green] Added '{new_cat}' (will persist when a vendor uses it)")
+            else:
+                console.print("  [yellow]No category name provided[/yellow]")
+
+        elif choice.lower() == 'r':
             # Rename category
             cat_num = click.prompt("Category number to rename", type=int)
             if 1 <= cat_num <= len(categories):
