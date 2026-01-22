@@ -1,0 +1,397 @@
+{
+  "vendors": [
+    {
+      "vendor_name": "CJ Affiliate",
+      "category": "Affiliate and Performance Marketing",
+      "detection_rules": {
+        "domains": [
+          "www.anrdoezrs.net",
+          "www.dpbolvw.net",
+          "www.awltovhc.com",
+          "cj.com"
+        ],
+        "url_patterns": [
+          "cjevent"
+        ]
+      }
+    },
+    {
+      "vendor_name": "Impact",
+      "category": "Affiliate and Performance Marketing",
+      "detection_rules": {
+        "domains": [
+          "d.impactradius-event.com",
+          "impact.com",
+          "impactradius.com"
+        ],
+        "url_patterns": [
+          "irclickid"
+        ]
+      }
+    },
+    {
+      "vendor_name": "Rakuten Advertising",
+      "category": "Affiliate and Performance Marketing",
+      "detection_rules": {
+        "domains": [
+          "rakuten.com",
+          "rakutenadvertising.com",
+          "track.linksynergy.com"
+        ],
+        "url_patterns": [
+          "mid="
+        ]
+      }
+    },
+    {
+      "vendor_name": "Amplitude",
+      "category": "Analytics and Experimentation",
+      "detection_rules": {
+        "domains": [
+          "cdn.amplitude.com",
+          "api.amplitude.com",
+          "amplitude.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "FullStory",
+      "category": "Analytics and Experimentation",
+      "detection_rules": {
+        "domains": [
+          "fullstory.com",
+          "rs.fullstory.com",
+          "edge.fullstory.com"
+        ],
+        "url_patterns": [
+          "fs.js"
+        ]
+      }
+    },
+    {
+      "vendor_name": "Google Analytics",
+      "category": "Analytics and Experimentation",
+      "detection_rules": {
+        "domains": [
+          "www.google-analytics.com",
+          "google-analytics.com",
+          "analytics.google.com",
+          "www.googletagmanager.com"
+        ],
+        "url_patterns": [
+          "UA-",
+          "G-",
+          "gtag/js"
+        ]
+      }
+    },
+    {
+      "vendor_name": "Heap",
+      "category": "Analytics and Experimentation",
+      "detection_rules": {
+        "domains": [
+          "heap.io",
+          "cdn.heapanalytics.com",
+          "heapanalytics.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Hotjar",
+      "category": "Analytics and Experimentation",
+      "detection_rules": {
+        "domains": [
+          "static.hotjar.com",
+          "script.hotjar.com",
+          "vars.hotjar.com"
+        ],
+        "url_patterns": [
+          "hjid="
+        ]
+      }
+    },
+    {
+      "vendor_name": "Quantum Metric",
+      "category": "Analytics and Experimentation",
+      "detection_rules": {
+        "domains": [
+          "quantummetric.com",
+          "cdn.quantummetric.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "MNTN/Steelhouse",
+      "category": "CTV and Streaming Attribution",
+      "detection_rules": {
+        "domains": [
+          "steelhousemedia.com",
+          "mountain.com",
+          "cdn.mntn.one"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Tatari",
+      "category": "CTV and Streaming Attribution",
+      "detection_rules": {
+        "domains": [
+          "tatari.tv",
+          "pixel.tatari.tv"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Cookiebot",
+      "category": "Consent Management",
+      "detection_rules": {
+        "domains": [
+          "consent.cookiebot.com",
+          "consentcdn.cookiebot.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "OneTrust",
+      "category": "Consent Management",
+      "detection_rules": {
+        "domains": [
+          "cdn.cookielaw.org",
+          "cookielaw.org",
+          "onetrust.com",
+          "optanon.blob.core.windows.net"
+        ],
+        "url_patterns": [
+          "otSDKStub"
+        ]
+      }
+    },
+    {
+      "vendor_name": "TrustArc",
+      "category": "Consent Management",
+      "detection_rules": {
+        "domains": [
+          "consent.trustarc.com",
+          "choices.trustarc.com",
+          "trustarc.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "LS Direct",
+      "category": "Direct Mail and Offline Attribution",
+      "detection_rules": {
+        "domains": [
+          "safevisit.online",
+          "lsdirect.com"
+        ],
+        "url_patterns": [
+          "lcid="
+        ]
+      }
+    },
+    {
+      "vendor_name": "PebblePost",
+      "category": "Direct Mail and Offline Attribution",
+      "detection_rules": {
+        "domains": [
+          "pebblepost.com",
+          "pbbl.co"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Postie",
+      "category": "Direct Mail and Offline Attribution",
+      "detection_rules": {
+        "domains": [
+          "postie.com",
+          "px.postie.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Postpilot",
+      "category": "Direct Mail and Offline Attribution",
+      "detection_rules": {
+        "domains": [
+          "e.postpilot.com",
+          "www.postpilot.com",
+          "get.postpilot.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "LiveIntent",
+      "category": "Identity and Data Infrastructure",
+      "detection_rules": {
+        "domains": [
+          "liadm.com",
+          "li-image.com",
+          "liveintent.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "LiveRamp",
+      "category": "Identity and Data Infrastructure",
+      "detection_rules": {
+        "domains": [
+          "idsync.rlcdn.com",
+          "api.rlcdn.com",
+          "liveramp.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Criteo",
+      "category": "Search and Display Advertising",
+      "detection_rules": {
+        "domains": [
+          "static.criteo.net",
+          "dis.criteo.com",
+          "sslwidget.criteo.com"
+        ],
+        "url_patterns": [
+          "criteo"
+        ]
+      }
+    },
+    {
+      "vendor_name": "Google Ads",
+      "category": "Search and Display Advertising",
+      "detection_rules": {
+        "domains": [
+          "googleads.g.doubleclick.net",
+          "www.googleadservices.com",
+          "pagead2.googlesyndication.com"
+        ],
+        "url_patterns": [
+          "conversion/",
+          "AW-"
+        ]
+      }
+    },
+    {
+      "vendor_name": "Microsoft/Bing Ads",
+      "category": "Search and Display Advertising",
+      "detection_rules": {
+        "domains": [
+          "bat.bing.com",
+          "clarity.ms"
+        ],
+        "url_patterns": [
+          "uetq"
+        ]
+      }
+    },
+    {
+      "vendor_name": "The Trade Desk",
+      "category": "Search and Display Advertising",
+      "detection_rules": {
+        "domains": [
+          "js.adsrvr.org",
+          "match.adsrvr.org",
+          "insight.adsrvr.org"
+        ],
+        "url_patterns": [
+          "ttd_"
+        ]
+      }
+    },
+    {
+      "vendor_name": "LinkedIn Insight Tag",
+      "category": "Social Media Advertising",
+      "detection_rules": {
+        "domains": [
+          "snap.licdn.com",
+          "px.ads.linkedin.com",
+          "linkedin.com/px"
+        ],
+        "url_patterns": [
+          "partner_id="
+        ]
+      }
+    },
+    {
+      "vendor_name": "Meta Pixel",
+      "category": "Social Media Advertising",
+      "detection_rules": {
+        "domains": [
+          "connect.facebook.net",
+          "facebook.com/tr",
+          "www.facebook.com/tr"
+        ],
+        "url_patterns": [
+          "fbevents.js",
+          "id="
+        ]
+      }
+    },
+    {
+      "vendor_name": "Pinterest Tag",
+      "category": "Social Media Advertising",
+      "detection_rules": {
+        "domains": [
+          "ct.pinterest.com",
+          "s.pinimg.com"
+        ],
+        "url_patterns": [
+          "tid="
+        ]
+      }
+    },
+    {
+      "vendor_name": "Snapchat Pixel",
+      "category": "Social Media Advertising",
+      "detection_rules": {
+        "domains": [
+          "sc-static.net",
+          "tr.snapchat.com"
+        ],
+        "url_patterns": [
+          "scevent.min.js"
+        ]
+      }
+    },
+    {
+      "vendor_name": "TikTok Pixel",
+      "category": "Social Media Advertising",
+      "detection_rules": {
+        "domains": [
+          "analytics.tiktok.com",
+          "tiktok.com/i18n"
+        ],
+        "url_patterns": [
+          "sdkid="
+        ]
+      }
+    },
+    {
+      "vendor_name": "X/Twitter Pixel",
+      "category": "Social Media Advertising",
+      "detection_rules": {
+        "domains": [
+          "static.ads-twitter.com",
+          "t.co",
+          "analytics.twitter.com"
+        ],
+        "url_patterns": [
+          "uwt.js"
+        ]
+      }
+    }
+  ]
+}
