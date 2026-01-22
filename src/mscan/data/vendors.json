@@ -125,6 +125,17 @@
       }
     },
     {
+      "vendor_name": "Demdex",
+      "category": "CDP",
+      "detection_rules": {
+        "domains": [
+          "hilton.demdex.net",
+          "dpm.demdex.net"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
       "vendor_name": "Segment",
       "category": "CDP",
       "detection_rules": {
@@ -225,6 +236,16 @@
           "consent.trustarc.com",
           "choices.trustarc.com",
           "trustarc.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Adform",
+      "category": "DSP",
+      "detection_rules": {
+        "domains": [
+          "c1.adform.net"
         ],
         "url_patterns": []
       }
@@ -386,6 +407,31 @@
         "url_patterns": [
           "criteo"
         ]
+      }
+    },
+    {
+      "vendor_name": "Taboola",
+      "category": "Performance",
+      "detection_rules": {
+        "domains": [
+          "trc.taboola.com",
+          "psb.taboola.com",
+          "trc-events.taboola.com",
+          "cds.taboola.com",
+          "pips.taboola.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Pubmatic",
+      "category": "SSP",
+      "detection_rules": {
+        "domains": [
+          "image2.pubmatic.com",
+          "simage2.pubmatic.com"
+        ],
+        "url_patterns": []
       }
     },
     {
