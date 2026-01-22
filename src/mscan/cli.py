@@ -212,26 +212,96 @@ def _smart_vendor_name(domain: str) -> str:
     return name
 
 
+# Preferred category order for display
+CATEGORY_ORDER = [
+    'Direct Mail and Offline Attribution',
+    'CTV and Streaming Attribution',
+    'Social Media Advertising',
+    'Search and Display Advertising',
+    'Affiliate and Performance Marketing',
+    'Analytics and Experimentation',
+    'Identity and Data Infrastructure',
+    'Consent Management',
+    'Other/Uncategorized',
+]
+
+
+def get_categories_from_db() -> list[str]:
+    """Get unique categories from vendor database, maintaining preferred order."""
+    vendors = load_vendors()
+    existing = set(v['category'] for v in vendors)
+
+    # Start with preferred order categories that exist
+    ordered = [c for c in CATEGORY_ORDER if c in existing]
+    # Add any new categories not in preferred order
+    for cat in sorted(existing):
+        if cat not in ordered:
+            ordered.append(cat)
+
+    # Always ensure Other/Uncategorized is available
+    if 'Other/Uncategorized' not in ordered:
+        ordered.append('Other/Uncategorized')
+
+    return ordered
+
+
+def prompt_for_category(console: Console, inline: bool = False) -> str:
+    """Prompt user to select a category, with option to create new one.
+
+    Args:
+        console: Rich console for output
+        inline: If True, show compact format for batch operations
+
+    Returns:
+        Selected or newly created category name
+    """
+    categories = get_categories_from_db()
+
+    if inline:
+        # Compact format for batch add
+        short_names = []
+        for i, cat in enumerate(categories, 1):
+            short = CATEGORY_SHORT_NAMES.get(cat, cat.split()[0])
+            short_names.append(f"{i}={short}")
+        console.print(f"[dim]Categories: {', '.join(short_names)}, 0=New[/dim]")
+
+        cat_choice = click.prompt("  Category", type=int, default=len(categories))
+    else:
+        # Full format for single add
+        console.print("\n[bold]Select category:[/bold]")
+        for i, cat in enumerate(categories, 1):
+            console.print(f"  {i}. {cat}")
+        console.print(f"  0. [cyan]+ Add new category[/cyan]")
+
+        cat_choice = click.prompt("Category number", type=int, default=len(categories))
+
+    if cat_choice == 0:
+        # Create new category
+        new_cat = click.prompt("  New category name")
+        if new_cat.strip():
+            console.print(f"  [green]✓[/green] New category: {new_cat}")
+            return new_cat.strip()
+        else:
+            return 'Other/Uncategorized'
+    elif 1 <= cat_choice <= len(categories):
+        return categories[cat_choice - 1]
+    else:
+        return 'Other/Uncategorized'
+
+
 def add_vendors_batch(domains: list[dict], console: Console):
     """Batch workflow to add multiple vendors efficiently."""
-    categories = [
-        'Direct Mail and Offline Attribution',
-        'CTV and Streaming Attribution',
-        'Social Media Advertising',
-        'Search and Display Advertising',
-        'Affiliate and Performance Marketing',
-        'Analytics and Experimentation',
-        'Identity and Data Infrastructure',
-        'Consent Management',
-        'Other/Uncategorized'
-    ]
-
     console.print()
     console.print(f"[bold]Adding {len(domains)} vendors...[/bold]")
     console.print()
 
     # Show category reference once
-    console.print("[dim]Categories: 1=Direct Mail, 2=CTV, 3=Social, 4=Search/Display, 5=Affiliate, 6=Analytics, 7=Identity, 8=Consent, 9=Other[/dim]")
+    categories = get_categories_from_db()
+    short_names = []
+    for i, cat in enumerate(categories, 1):
+        short = CATEGORY_SHORT_NAMES.get(cat, cat.split()[0])
+        short_names.append(f"{i}={short}")
+    console.print(f"[dim]Categories: {', '.join(short_names)}, 0=New[/dim]")
     console.print()
 
     new_vendors = []
@@ -245,9 +315,15 @@ def add_vendors_batch(domains: list[dict], console: Console):
         # Prompt for vendor name
         vendor_name = click.prompt("  Name", default=default_name)
 
-        # Prompt for category (inline)
-        cat_choice = click.prompt("  Category (1-9)", type=int, default=9)
-        if 1 <= cat_choice <= len(categories):
+        # Prompt for category with option for new
+        categories = get_categories_from_db()  # Refresh in case new one was added
+        cat_choice = click.prompt(f"  Category (0-{len(categories)})", type=int, default=len(categories))
+
+        if cat_choice == 0:
+            new_cat = click.prompt("  New category name")
+            category = new_cat.strip() if new_cat.strip() else 'Other/Uncategorized'
+            console.print(f"  [cyan]+ New category:[/cyan] {category}")
+        elif 1 <= cat_choice <= len(categories):
             category = categories[cat_choice - 1]
         else:
             category = 'Other/Uncategorized'
@@ -264,7 +340,7 @@ def add_vendors_batch(domains: list[dict], console: Console):
         new_vendors.append(new_vendor)
 
         # Show short category name
-        short_cat = category.split(' and ')[0].split(' ')[0]  # "Direct Mail and..." -> "Direct"
+        short_cat = CATEGORY_SHORT_NAMES.get(category, category.split(' and ')[0].split()[0])
         console.print(f"  [green]✓[/green] {vendor_name} ({short_cat})")
         console.print()
 
@@ -587,26 +663,7 @@ def add_vendor(vendor_name: str, sample_url: str, category: str, timeout: int):
 
     # Get category if not provided
     if not category:
-        console.print("\n[bold]Select category:[/bold]")
-        categories = [
-            'Direct Mail and Offline Attribution',
-            'Social Media Advertising',
-            'Search and Display Advertising',
-            'Affiliate and Performance Marketing',
-            'CTV and Streaming Attribution',
-            'Analytics and Experimentation',
-            'Identity and Data Infrastructure',
-            'Consent Management',
-            'Other/Uncategorized'
-        ]
-        for i, cat in enumerate(categories, 1):
-            console.print(f"  {i}. {cat}")
-
-        cat_choice = click.prompt("Category number", type=int, default=9)
-        if 1 <= cat_choice <= len(categories):
-            category = categories[cat_choice - 1]
-        else:
-            category = 'Other/Uncategorized'
+        category = prompt_for_category(console, inline=False)
 
     # Create new vendor entry
     new_vendor = {
@@ -640,6 +697,105 @@ def add_vendor(vendor_name: str, sample_url: str, category: str, timeout: int):
         console.print(f"\n[green]Successfully added '{vendor_name}' to vendors.json[/green]")
     else:
         console.print("[yellow]Cancelled[/yellow]")
+
+
+@cli.command('manage-categories')
+def manage_categories():
+    """Manage vendor categories - rename or delete."""
+    from rich.table import Table
+
+    console = Console()
+    vendors = load_vendors()
+
+    # Count vendors per category
+    cat_counts = {}
+    for v in vendors:
+        cat = v['category']
+        cat_counts[cat] = cat_counts.get(cat, 0) + 1
+
+    # Get ordered categories
+    categories = get_categories_from_db()
+
+    while True:
+        console.print("\n[bold]Categories in database:[/bold]\n")
+
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("#", style="dim", width=3)
+        table.add_column("Category", style="white")
+        table.add_column("Vendors", justify="right")
+
+        for i, cat in enumerate(categories, 1):
+            count = cat_counts.get(cat, 0)
+            table.add_row(str(i), cat, str(count))
+
+        console.print(table)
+
+        console.print("\n[bold]Options:[/bold]")
+        console.print("  [cyan]r[/cyan] - Rename a category")
+        console.print("  [cyan]d[/cyan] - Delete empty category")
+        console.print("  [cyan]Enter[/cyan] - Exit")
+
+        choice = click.prompt("Choice", default="", show_default=False)
+
+        if not choice.strip():
+            break
+
+        if choice.lower() == 'r':
+            # Rename category
+            cat_num = click.prompt("Category number to rename", type=int)
+            if 1 <= cat_num <= len(categories):
+                old_name = categories[cat_num - 1]
+                count = cat_counts.get(old_name, 0)
+                console.print(f"  Current name: [cyan]{old_name}[/cyan]")
+                new_name = click.prompt("  New name", default=old_name)
+
+                if new_name.strip() and new_name.strip() != old_name:
+                    new_name = new_name.strip()
+                    # Update all vendors with this category
+                    vendors_file = get_vendors_path()
+                    with open(vendors_file, 'r') as f:
+                        data = json.load(f)
+
+                    updated = 0
+                    for v in data['vendors']:
+                        if v['category'] == old_name:
+                            v['category'] = new_name
+                            updated += 1
+
+                    data['vendors'].sort(key=lambda v: (v['category'], v['vendor_name']))
+
+                    with open(vendors_file, 'w') as f:
+                        json.dump(data, f, indent=2)
+
+                    console.print(f"  [green]✓[/green] Renamed '{old_name}' → '{new_name}' ({updated} vendors updated)")
+
+                    # Refresh data
+                    vendors = load_vendors()
+                    cat_counts = {}
+                    for v in vendors:
+                        cat = v['category']
+                        cat_counts[cat] = cat_counts.get(cat, 0) + 1
+                    categories = get_categories_from_db()
+                else:
+                    console.print("  [yellow]No change[/yellow]")
+            else:
+                console.print("  [red]Invalid category number[/red]")
+
+        elif choice.lower() == 'd':
+            # Delete empty category
+            cat_num = click.prompt("Category number to delete", type=int)
+            if 1 <= cat_num <= len(categories):
+                cat_name = categories[cat_num - 1]
+                count = cat_counts.get(cat_name, 0)
+
+                if count > 0:
+                    console.print(f"  [red]Cannot delete '{cat_name}' - has {count} vendors[/red]")
+                else:
+                    console.print(f"  [green]✓[/green] Category '{cat_name}' removed (was empty)")
+                    # Note: empty categories aren't stored, they just won't appear next time
+                    categories = [c for c in categories if c != cat_name]
+            else:
+                console.print("  [red]Invalid category number[/red]")
 
 
 if __name__ == '__main__':

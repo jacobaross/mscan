@@ -279,6 +279,41 @@
       }
     },
     {
+      "vendor_name": "Applovin",
+      "category": "Other/Uncategorized",
+      "detection_rules": {
+        "domains": [
+          "b.applovin.com",
+          "res4.applovin.com",
+          "re.applovin.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Klaviyo",
+      "category": "Other/Uncategorized",
+      "detection_rules": {
+        "domains": [
+          "static-forms.klaviyo.com",
+          "static-tracking.klaviyo.com",
+          "fast.a.klaviyo.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Shopify",
+      "category": "Other/Uncategorized",
+      "detection_rules": {
+        "domains": [
+          "error-analytics-sessions-production.shopifysvc.com",
+          "monorail-edge.shopifysvc.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
       "vendor_name": "Criteo",
       "category": "Search and Display Advertising",
       "detection_rules": {
