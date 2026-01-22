@@ -238,10 +238,6 @@ def get_categories_from_db() -> list[str]:
         if cat not in ordered:
             ordered.append(cat)
 
-    # Always ensure Other/Uncategorized is available
-    if 'Other/Uncategorized' not in ordered:
-        ordered.append('Other/Uncategorized')
-
     return ordered
 
 
