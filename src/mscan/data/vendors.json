@@ -181,6 +181,17 @@
       }
     },
     {
+      "vendor_name": "Tvsquared",
+      "category": "CTV",
+      "detection_rules": {
+        "domains": [
+          "collector-35216.us.tvsquared.com",
+          "collector-35186.us.tvsquared.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
       "vendor_name": "Cookiebot",
       "category": "Consent Mgmt",
       "detection_rules": {
@@ -275,6 +286,19 @@
           "e.postpilot.com",
           "www.postpilot.com",
           "get.postpilot.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Bluecore",
+      "category": "Email",
+      "detection_rules": {
+        "domains": [
+          "onsitestats.bluecore.com",
+          "api.bluecore.com",
+          "site.bluecore.com",
+          "api.bluecore.app"
         ],
         "url_patterns": []
       }

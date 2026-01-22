@@ -1,8 +1,6 @@
 """CLI entry point for the Martech Scanner."""
 
 import json
-import shutil
-import subprocess
 import click
 from pathlib import Path
 from urllib.parse import urlparse
@@ -472,23 +470,27 @@ def scan(url: str, timeout: int, pages: int, headless: bool, system_browser: boo
         with open(report_path, 'r') as f:
             console.print(f.read())
 
-    # Interactive options
-    viewer = 'bat' if shutil.which('bat') else 'less'
-    viewer_name = 'bat' if viewer == 'bat' else 'pager'
+    # Interactive options loop
+    while True:
+        console.print()
+        console.print("[bold]Options:[/bold]")
+        console.print("  [cyan]v[/cyan] - View full report")
+        if unknown_domains:
+            console.print(f"  [cyan]u[/cyan] - View {len(unknown_domains)} unknown domains (potential new vendors)")
+        console.print("  [cyan]Enter[/cyan] - Exit")
 
-    console.print()
-    console.print("[bold]Options:[/bold]")
-    console.print(f"  [cyan]v[/cyan] - View report in {viewer_name}")
-    if unknown_domains:
-        console.print(f"  [cyan]u[/cyan] - View {len(unknown_domains)} unknown domains (potential new vendors)")
-    console.print("  [cyan]Enter[/cyan] - Exit")
+        choice = click.prompt("Choice", default="", show_default=False)
 
-    choice = click.prompt("Choice", default="", show_default=False)
-
-    if choice.lower() == 'v':
-        subprocess.run([viewer, report_path])
-    elif choice.lower() == 'u' and unknown_domains:
-        show_unknown_domains(unknown_domains, console)
+        if choice.lower() == 'v':
+            console.print()
+            console.rule("[bold]FULL REPORT[/bold]", style="cyan")
+            with open(report_path, 'r') as f:
+                console.print(f.read())
+        elif choice.lower() == 'u' and unknown_domains:
+            show_unknown_domains(unknown_domains, console)
+            break  # Exit after unknown domains workflow
+        else:
+            break  # Exit on Enter or any other input
 
 
 @cli.command('list-vendors')
