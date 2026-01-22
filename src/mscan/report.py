@@ -7,22 +7,6 @@ from urllib.parse import urlparse
 from mscan.fingerprints import get_all_categories, load_vendors
 
 
-# Category display order: direct competitors first, then others
-CATEGORY_ORDER = [
-    'Direct Mail',
-    'CTV',
-    'Social Media',
-    'Search',
-    'Affiliate',
-    'Performance',
-    'Analytics',
-    'ID & Data Infra',
-    'Consent Mgmt',
-    'CDP',
-    'DSP',
-    'Email',
-    'Other',
-]
 
 
 def generate_report(
@@ -127,58 +111,27 @@ def _build_summary(detected_vendors: list[dict]) -> str:
 
     lines.append("")
 
-    # Direct Mail
-    if 'Direct Mail' in by_category:
-        vendors = by_category['Direct Mail']
-        names = [v['vendor_name'] for v in vendors]
-        details = [v['details'] for v in vendors if v.get('details')]
-        detail_str = f" ({details[0]})" if details else ""
-        lines.append(f"  * Direct Mail: {', '.join(names)}{detail_str}")
+    # Use dynamic category order from database
+    category_order = get_all_categories()
 
-    # CTV
-    if 'CTV' in by_category:
-        vendors = by_category['CTV']
-        names = [v['vendor_name'] for v in vendors]
-        lines.append(f"  * CTV/Streaming: {', '.join(names)}")
+    for cat in category_order:
+        if cat not in by_category:
+            continue
 
-    # Social
-    if 'Social Media' in by_category:
-        vendors = by_category['Social Media']
+        vendors = by_category[cat]
         names = [v['vendor_name'] for v in vendors]
-        if len(names) >= 3:
-            lines.append(f"  * Social (heavy): {', '.join(names)}")
+
+        # Special handling for certain categories
+        if cat == 'Direct Mail':
+            # Include details (e.g., client IDs) for competitive category
+            details = [v['details'] for v in vendors if v.get('details')]
+            detail_str = f" ({details[0]})" if details else ""
+            lines.append(f"  * {cat}: {', '.join(names)}{detail_str}")
+        elif cat == 'Social Media' and len(names) >= 3:
+            # Flag heavy social presence
+            lines.append(f"  * {cat} (heavy): {', '.join(names)}")
         else:
-            lines.append(f"  * Social: {', '.join(names)}")
-
-    # Affiliate
-    if 'Affiliate' in by_category:
-        vendors = by_category['Affiliate']
-        names = [v['vendor_name'] for v in vendors]
-        lines.append(f"  * Affiliate: {', '.join(names)}")
-
-    # Performance
-    if 'Performance' in by_category:
-        vendors = by_category['Performance']
-        names = [v['vendor_name'] for v in vendors]
-        lines.append(f"  * Performance: {', '.join(names)}")
-
-    # Analytics depth
-    if 'Analytics' in by_category:
-        vendors = by_category['Analytics']
-        names = [v['vendor_name'] for v in vendors]
-        lines.append(f"  * Analytics: {', '.join(names)}")
-
-    # Identity
-    if 'ID & Data Infra' in by_category:
-        vendors = by_category['ID & Data Infra']
-        names = [v['vendor_name'] for v in vendors]
-        lines.append(f"  * Identity: {', '.join(names)}")
-
-    # Consent
-    if 'Consent Mgmt' in by_category:
-        vendors = by_category['Consent Mgmt']
-        names = [v['vendor_name'] for v in vendors]
-        lines.append(f"  * Consent: {', '.join(names)}")
+            lines.append(f"  * {cat}: {', '.join(names)}")
 
     # Summary stat
     total = len(detected_vendors)
@@ -223,17 +176,16 @@ def _build_vendor_table(detected_vendors: list[dict]) -> str:
     lines.append(header)
     lines.append("  " + "-" * (width - 4))
 
-    # Process categories in defined order
-    for category in CATEGORY_ORDER:
+    # Process categories in dynamic order from database
+    for category in get_all_categories():
         if category not in vendors_by_cat:
             continue
 
         category_vendors = vendors_by_cat[category]
 
-        # Category separator
-        short_cat = _short_category_name(category)
+        # Category separator (uppercase for display)
         lines.append("")
-        lines.append(f"  [{short_cat}]")
+        lines.append(f"  [{category.upper()}]")
 
         for vendor in sorted(category_vendors, key=lambda v: v['vendor_name']):
             name = vendor['vendor_name']
@@ -260,21 +212,3 @@ def _build_vendor_table(detected_vendors: list[dict]) -> str:
     return '\n'.join(lines)
 
 
-def _short_category_name(category: str) -> str:
-    """Return a shortened category name for display."""
-    mapping = {
-        'Direct Mail': 'DIRECT MAIL',
-        'CTV': 'CTV/STREAMING',
-        'Social Media': 'SOCIAL',
-        'Search': 'SEARCH',
-        'Affiliate': 'AFFILIATE',
-        'Performance': 'PERFORMANCE',
-        'Analytics': 'ANALYTICS',
-        'ID & Data Infra': 'IDENTITY',
-        'Consent Mgmt': 'CONSENT',
-        'CDP': 'CDP',
-        'DSP': 'DSP',
-        'Email': 'EMAIL',
-        'Other': 'OTHER',
-    }
-    return mapping.get(category, category.upper())

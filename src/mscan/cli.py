@@ -11,25 +11,14 @@ from rich.text import Text
 from rich.status import Status
 
 from mscan.scanner import scan_website_sync
-from mscan.fingerprints import match_vendors, load_vendors, get_vendors_path, find_unknown_domains
+from mscan.fingerprints import match_vendors, load_vendors, get_vendors_path, find_unknown_domains, get_all_categories
 from mscan.report import generate_report
 
 # Competitive categories - these get special attention in takeaways
 COMPETITIVE_CATEGORIES = [
-    'Direct Mail and Offline Attribution',
-    'CTV and Streaming Attribution',
+    'Direct Mail',
+    'CTV',
 ]
-
-CATEGORY_SHORT_NAMES = {
-    'Direct Mail and Offline Attribution': 'Direct Mail',
-    'CTV and Streaming Attribution': 'CTV',
-    'Social Media Advertising': 'Social',
-    'Search and Display Advertising': 'Search/Display',
-    'Affiliate and Performance Marketing': 'Affiliate',
-    'Analytics and Experimentation': 'Analytics',
-    'Identity and Data Infrastructure': 'Identity',
-    'Consent Management': 'Consent',
-}
 
 
 def normalize_url(url: str) -> str:
@@ -72,21 +61,11 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
         console.print("  [dim]No martech vendors detected from the fingerprint database.[/dim]")
         console.print("  [dim]Site may use unlisted vendors or block tracking scripts.[/dim]")
     else:
-        # Show findings by category (prioritize competitive categories)
-        category_order = [
-            'Direct Mail and Offline Attribution',
-            'CTV and Streaming Attribution',
-            'Social Media Advertising',
-            'Search and Display Advertising',
-            'Affiliate and Performance Marketing',
-            'Analytics and Experimentation',
-            'Identity and Data Infrastructure',
-            'Consent Management',
-        ]
+        # Show findings by category (use dynamic category order from database)
+        category_order = get_all_categories()
 
         for cat in category_order:
             if cat in by_category:
-                short_name = CATEGORY_SHORT_NAMES.get(cat, cat)
                 vendors = by_category[cat]
                 vendor_names = [v['vendor_name'] for v in vendors]
 
@@ -94,13 +73,14 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
 
                 # Highlight competitive categories
                 if cat in COMPETITIVE_CATEGORIES:
-                    console.print(f"  [yellow]{count_prefix} {short_name}:[/yellow] {', '.join(vendor_names)}")
+                    console.print(f"  [yellow]{count_prefix} {cat}:[/yellow] {', '.join(vendor_names)}")
                 else:
-                    console.print(f"  [dim]{count_prefix}[/dim] [white]{short_name}:[/white] {', '.join(vendor_names)}")
+                    console.print(f"  [dim]{count_prefix}[/dim] [white]{cat}:[/white] {', '.join(vendor_names)}")
 
         # Stats line
         console.print()
-        console.print(f"  [dim]Categories: {len(by_category)} of 8  |  Vendors: {len(detected)} of {total_in_db} in database[/dim]")
+        total_categories = len(get_all_categories())
+        console.print(f"  [dim]Categories: {len(by_category)} of {total_categories}  |  Vendors: {len(detected)} of {total_in_db} in database[/dim]")
 
     # === TAKEAWAY ===
     console.print()
@@ -109,7 +89,7 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
     takeaways = []
 
     # Check Direct Mail (competitive)
-    dm_cat = 'Direct Mail and Offline Attribution'
+    dm_cat = 'Direct Mail'
     if dm_cat in by_category:
         dm_vendors = [v['vendor_name'] for v in by_category[dm_cat]]
         takeaways.append(f"[yellow]Competitor alert:[/yellow] Using {', '.join(dm_vendors)} for direct mail")
@@ -117,7 +97,7 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
         takeaways.append("[green]No direct mail vendor[/green] - potential prospect")
 
     # Check CTV (competitive)
-    ctv_cat = 'CTV and Streaming Attribution'
+    ctv_cat = 'CTV'
     if ctv_cat in by_category:
         ctv_vendors = [v['vendor_name'] for v in by_category[ctv_cat]]
         takeaways.append(f"[yellow]Competitor alert:[/yellow] Using {', '.join(ctv_vendors)} for CTV")
@@ -125,7 +105,7 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
         takeaways.append("[green]No CTV vendor[/green] - potential prospect")
 
     # Social stack assessment
-    social_cat = 'Social Media Advertising'
+    social_cat = 'Social Media'
     if social_cat in by_category:
         social_count = len(by_category[social_cat])
         if social_count >= 3:
@@ -211,33 +191,10 @@ def _smart_vendor_name(domain: str) -> str:
     return name
 
 
-# Preferred category order for display
-CATEGORY_ORDER = [
-    'Direct Mail and Offline Attribution',
-    'CTV and Streaming Attribution',
-    'Social Media Advertising',
-    'Search and Display Advertising',
-    'Affiliate and Performance Marketing',
-    'Analytics and Experimentation',
-    'Identity and Data Infrastructure',
-    'Consent Management',
-    'Other/Uncategorized',
-]
-
-
 def get_categories_from_db() -> list[str]:
     """Get unique categories from vendor database, maintaining preferred order."""
-    vendors = load_vendors()
-    existing = set(v['category'] for v in vendors)
-
-    # Start with preferred order categories that exist
-    ordered = [c for c in CATEGORY_ORDER if c in existing]
-    # Add any new categories not in preferred order
-    for cat in sorted(existing):
-        if cat not in ordered:
-            ordered.append(cat)
-
-    return ordered
+    # Delegate to fingerprints module which has the canonical category order
+    return get_all_categories()
 
 
 def prompt_for_category(console: Console, inline: bool = False) -> str:
@@ -254,11 +211,10 @@ def prompt_for_category(console: Console, inline: bool = False) -> str:
 
     if inline:
         # Compact format for batch add
-        short_names = []
+        cat_labels = []
         for i, cat in enumerate(categories, 1):
-            short = CATEGORY_SHORT_NAMES.get(cat, cat.split()[0])
-            short_names.append(f"{i}={short}")
-        console.print(f"[dim]Categories: {', '.join(short_names)}, 0=New[/dim]")
+            cat_labels.append(f"{i}={cat}")
+        console.print(f"[dim]Categories: {', '.join(cat_labels)}, 0=New[/dim]")
 
         cat_choice = click.prompt("  Category", type=int, default=len(categories))
     else:
@@ -293,11 +249,10 @@ def add_vendors_batch(domains: list[dict], console: Console):
 
     # Show category reference once
     categories = get_categories_from_db()
-    short_names = []
+    cat_labels = []
     for i, cat in enumerate(categories, 1):
-        short = CATEGORY_SHORT_NAMES.get(cat, cat.split()[0])
-        short_names.append(f"{i}={short}")
-    console.print(f"[dim]Categories: {', '.join(short_names)}, 0=New[/dim]")
+        cat_labels.append(f"{i}={cat}")
+    console.print(f"[dim]Categories: {', '.join(cat_labels)}, 0=New[/dim]")
     console.print()
 
     new_vendors = []
@@ -329,11 +284,7 @@ def add_vendors_batch(domains: list[dict], console: Console):
                     'vendor': existing_vendor,
                     'domains': domain_info['full_domains']
                 })
-                short_cat = CATEGORY_SHORT_NAMES.get(
-                    existing_vendor['category'],
-                    existing_vendor['category'].split(' and ')[0].split()[0]
-                )
-                console.print(f"  [green]✓[/green] Added to {existing_vendor['vendor_name']} ({short_cat})")
+                console.print(f"  [green]✓[/green] Added to {existing_vendor['vendor_name']} ({existing_vendor['category']})")
                 console.print()
                 continue
 
@@ -364,9 +315,8 @@ def add_vendors_batch(domains: list[dict], console: Console):
         # Add to map so subsequent domains can reference it
         vendor_name_map[vendor_name.lower()] = new_vendor
 
-        # Show short category name
-        short_cat = CATEGORY_SHORT_NAMES.get(category, category.split(' and ')[0].split()[0])
-        console.print(f"  [green]✓[/green] {vendor_name} ({short_cat})")
+        # Show category name
+        console.print(f"  [green]✓[/green] {vendor_name} ({category})")
         console.print()
 
     # Save all changes
@@ -518,17 +468,8 @@ def list_vendors(category):
             by_category[cat] = []
         by_category[cat].append(vendor)
 
-    # Category order
-    category_order = [
-        'Direct Mail and Offline Attribution',
-        'Social Media Advertising',
-        'Search and Display Advertising',
-        'Affiliate and Performance Marketing',
-        'CTV and Streaming Attribution',
-        'Analytics and Experimentation',
-        'Identity and Data Infrastructure',
-        'Consent Management',
-    ]
+    # Use dynamic category order from database
+    category_order = get_all_categories()
 
     sorted_categories = [c for c in category_order if c in by_category]
     sorted_categories += [c for c in by_category if c not in category_order]
