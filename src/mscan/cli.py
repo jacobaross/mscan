@@ -693,6 +693,252 @@ def add_vendor(vendor_name: str, sample_url: str, category: str, timeout: int):
         console.print("[yellow]Cancelled[/yellow]")
 
 
+@cli.command('batch')
+@click.argument('file', type=click.Path(exists=True))
+@click.option('--timeout', '-t', default=10, help='Seconds to wait for network activity per page')
+@click.option('--pages', '-p', default=1, help='Maximum internal pages to scan beyond homepage')
+@click.option('--headless', is_flag=True, help='Run in headless mode (may be blocked by bot detection)')
+@click.option('--system-browser', '-s', is_flag=True, help='Use system Chromium (bypasses Akamai/bot detection)')
+@click.option('--csv', 'csv_output', type=click.Path(), default=None, help='Export results to CSV file')
+def batch(file: str, timeout: int, pages: int, headless: bool, system_browser: bool, csv_output: str):
+    """Batch scan multiple domains from a file.
+
+    FILE can be a text file with one domain per line, or a CSV file.
+    Lines starting with # are treated as comments and skipped.
+
+    Example:
+        mscan batch domains.txt
+        mscan batch domains.txt --csv results.csv
+    """
+    import csv as csv_module
+    from rich.table import Table
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+
+    console = Console()
+
+    # Read domains from file
+    domains = []
+    file_path = Path(file)
+
+    with open(file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            # Skip empty lines and comments
+            if not line or line.startswith('#'):
+                continue
+            # Handle CSV - take first column
+            if ',' in line:
+                line = line.split(',')[0].strip()
+            # Remove quotes if present
+            line = line.strip('"\'')
+            if line:
+                domains.append(line)
+
+    if not domains:
+        console.print("[red]No domains found in file[/red]")
+        return
+
+    console.print(f"[bold]Batch scanning {len(domains)} domains...[/bold]")
+    console.print(f"  Timeout: {timeout}s per page | Max pages: {pages + 1}")
+    console.print()
+
+    # Get all categories for table columns
+    all_categories = get_all_categories()
+
+    # Store results for each domain
+    results = []
+
+    # Scan each domain with progress
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console
+    ) as progress:
+        task = progress.add_task("Scanning...", total=len(domains))
+
+        for domain in domains:
+            url = normalize_url(domain)
+            domain_name = extract_domain_name(url)
+            progress.update(task, description=f"Scanning {domain_name}...")
+
+            try:
+                # Scan website
+                scan_results = scan_website_sync(
+                    url,
+                    timeout_seconds=timeout,
+                    max_internal_pages=pages,
+                    headless=headless,
+                    system_browser=system_browser,
+                    status_callback=None  # No status updates in batch mode
+                )
+
+                requests = scan_results.get('requests', [])
+
+                # Match vendors
+                detected = match_vendors(requests)
+
+                # Find unknown domains
+                unknown_domains = find_unknown_domains(requests, domain_name)
+
+                # Group detected by category
+                by_category = {}
+                for vendor in detected:
+                    cat = vendor['category']
+                    if cat not in by_category:
+                        by_category[cat] = []
+                    by_category[cat].append(vendor['vendor_name'])
+
+                # Store result
+                results.append({
+                    'domain': domain_name,
+                    'status': 'ok',
+                    'by_category': by_category,
+                    'unknown': [u['domain'] for u in unknown_domains[:10]],  # Top 10
+                    'unknown_count': len(unknown_domains)
+                })
+
+            except Exception as e:
+                results.append({
+                    'domain': domain_name,
+                    'status': 'error',
+                    'error': str(e),
+                    'by_category': {},
+                    'unknown': [],
+                    'unknown_count': 0
+                })
+
+            progress.advance(task)
+
+    console.print()
+
+    # Determine which categories have any data across all results
+    categories_with_data = set()
+    for result in results:
+        if result['status'] == 'ok':
+            for cat in result['by_category']:
+                if result['by_category'][cat]:
+                    categories_with_data.add(cat)
+
+    # Always include competitive categories even if empty
+    for cat in COMPETITIVE_CATEGORIES:
+        categories_with_data.add(cat)
+
+    # Filter to only categories with data, maintaining order
+    display_categories = [cat for cat in all_categories if cat in categories_with_data]
+
+    # Build and display results table
+    table = Table(title="Batch Scan Results", show_header=True, header_style="bold", box=None)
+    table.add_column("Brand", style="cyan", no_wrap=True)
+
+    # Short category names for display
+    category_short_names = {
+        'Direct Mail': 'Direct Mail',
+        'CTV': 'CTV',
+        'Social Media': 'Social',
+        'Search': 'Search',
+        'Affiliate': 'Affiliate',
+        'Performance': 'Performance',
+        'Analytics': 'Analytics',
+        'ID & Data Infra': 'ID/Data',
+        'Consent Mgmt': 'Consent',
+        'CDP': 'CDP',
+        'DSP': 'DSP',
+        'Email': 'Email',
+        'Other': 'Other',
+        'SSP': 'SSP',
+    }
+
+    for cat in display_categories:
+        short_name = category_short_names.get(cat, cat)
+        if cat in COMPETITIVE_CATEGORIES:
+            table.add_column(short_name, style="yellow")
+        else:
+            table.add_column(short_name, style="white")
+
+    table.add_column("Unknown", style="dim")
+
+    # Vendor name shortening map
+    vendor_short = {
+        'PebblePost': 'PebblePost',
+        'LS Direct': 'LS Direct',
+        'Meta Pixel': 'Meta',
+        'Snapchat Pixel': 'Snap',
+        'TikTok Pixel': 'TikTok',
+        'X/Twitter Pixel': 'X',
+        'Pinterest Tag': 'Pinterest',
+        'LinkedIn Insight': 'LinkedIn',
+        'Reddit Pixel': 'Reddit',
+        'Google Ads': 'GAds',
+        'MSFT/Bing': 'Bing',
+        'Google Analytics': 'GA',
+        'Adobe Analytics': 'Adobe',
+        'The Trade Desk': 'TTD',
+        'MNTN/SHOU': 'MNTN',
+    }
+
+    def shorten_vendor(name):
+        return vendor_short.get(name, name.replace(' Pixel', '').replace(' Tag', ''))
+
+    # Add rows for each domain
+    for result in results:
+        if result['status'] == 'error':
+            row = [result['domain']] + ['[red]ERR[/red]'] * (len(display_categories) + 1)
+        else:
+            row = [result['domain']]
+            for cat in display_categories:
+                vendors = result['by_category'].get(cat, [])
+                if vendors:
+                    short_names = [shorten_vendor(v) for v in vendors]
+                    row.append(', '.join(short_names))
+                else:
+                    row.append('-')
+            # Unknown trackers column
+            if result['unknown']:
+                if result['unknown_count'] <= 5:
+                    row.append(', '.join(result['unknown']))
+                else:
+                    top_3 = result['unknown'][:3]
+                    row.append(f"{', '.join(top_3)} +{result['unknown_count'] - 3}")
+            else:
+                row.append('-')
+        table.add_row(*row)
+
+    console.print(table)
+
+    # Summary stats
+    successful = sum(1 for r in results if r['status'] == 'ok')
+    failed = sum(1 for r in results if r['status'] == 'error')
+    console.print()
+    console.print(f"[dim]Scanned: {successful} successful, {failed} failed[/dim]")
+
+    # Export to CSV if requested
+    if csv_output:
+        csv_path = Path(csv_output)
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv_module.writer(f)
+
+            # Header row
+            header = ['Brand'] + all_categories + ['Unknown Trackers']
+            writer.writerow(header)
+
+            # Data rows
+            for result in results:
+                if result['status'] == 'error':
+                    row = [result['domain']] + ['ERROR'] * (len(all_categories) + 1)
+                else:
+                    row = [result['domain']]
+                    for cat in all_categories:
+                        vendors = result['by_category'].get(cat, [])
+                        row.append(', '.join(vendors) if vendors else '')
+                    # Unknown trackers
+                    row.append(', '.join(result['unknown']) if result['unknown'] else '')
+                writer.writerow(row)
+
+        console.print(f"[green]Results exported to {csv_path}[/green]")
+
+
 @cli.command('manage-categories')
 def manage_categories():
     """Manage vendor categories - rename or delete."""
