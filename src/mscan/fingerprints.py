@@ -7,6 +7,76 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 
+# Cache for tracker database
+_tracker_db_cache = None
+
+
+def load_tracker_db() -> dict:
+    """Load the tracker database (whotracks.me data) for fallback matching."""
+    global _tracker_db_cache
+    
+    if _tracker_db_cache is not None:
+        return _tracker_db_cache
+    
+    try:
+        with resources.files('mscan.data').joinpath('tracker_db.json').open('r') as f:
+            _tracker_db_cache = json.load(f)
+    except (TypeError, FileNotFoundError):
+        # Fallback for development mode
+        tracker_file = Path(__file__).parent / 'data' / 'tracker_db.json'
+        if tracker_file.exists():
+            with open(tracker_file, 'r') as f:
+                _tracker_db_cache = json.load(f)
+        else:
+            _tracker_db_cache = {"domains": {}}
+    
+    return _tracker_db_cache
+
+
+def match_tracker_db(domain: str) -> dict | None:
+    """
+    Check if a domain matches the tracker database (whotracks.me fallback).
+    
+    Args:
+        domain: Domain to check (e.g., "analytics.tiktok.com")
+    
+    Returns:
+        Match dict with vendor/category if found, None otherwise
+    """
+    tracker_db = load_tracker_db()
+    domains_db = tracker_db.get("domains", {})
+    
+    # Normalize domain
+    domain_clean = domain.lower().replace("www.", "")
+    
+    # Try exact match first
+    if domain_clean in domains_db:
+        info = domains_db[domain_clean]
+        return {
+            "vendor_name": info["vendor"],
+            "category": info["category"],
+            "source": "tracker_db",
+            "matching_domains": [domain_clean],
+            "details": ""
+        }
+    
+    # Try base domain (e.g., "sub.example.com" -> "example.com")
+    parts = domain_clean.split(".")
+    if len(parts) >= 2:
+        base_domain = ".".join(parts[-2:])
+        if base_domain in domains_db:
+            info = domains_db[base_domain]
+            return {
+                "vendor_name": info["vendor"],
+                "category": info["category"],
+                "source": "tracker_db",
+                "matching_domains": [base_domain],
+                "details": ""
+            }
+    
+    return None
+
+
 def load_vendors(vendors_file: str = None) -> list[dict]:
     """Load vendor fingerprints from JSON file."""
     if vendors_file is None:
@@ -29,6 +99,61 @@ def load_vendors(vendors_file: str = None) -> list[dict]:
 def get_vendors_path() -> Path:
     """Get the path to the vendors.json file for writing."""
     return Path(__file__).parent / 'data' / 'vendors.json'
+
+
+def match_vendors_extended(requests: list[str], vendors: list[dict] = None) -> list[dict]:
+    """
+    Match requests against vendors.json AND tracker_db.json (fallback).
+    
+    This combines both data sources for comprehensive vendor detection.
+    vendors.json matches take priority over tracker_db matches.
+    
+    Args:
+        requests: List of captured request URLs
+        vendors: List of vendor fingerprints (loads from file if not provided)
+    
+    Returns:
+        List of detected vendors with details
+    """
+    # First, get matches from vendors.json (priority)
+    detected = match_vendors(requests, vendors)
+    detected_vendor_names = {v['vendor_name'].lower() for v in detected}
+    
+    # Track domains we've already matched
+    matched_domains = set()
+    for v in detected:
+        for d in v.get('matching_domains', []):
+            matched_domains.add(d.lower())
+    
+    # Now check tracker_db for additional matches
+    for request_url in requests:
+        parsed = urlparse(request_url)
+        domain = parsed.netloc.lower()
+        
+        if not domain or domain in matched_domains:
+            continue
+        
+        # Check tracker_db
+        tracker_match = match_tracker_db(domain)
+        if tracker_match:
+            vendor_name = tracker_match['vendor_name']
+            # Skip if we already have this vendor from vendors.json
+            if vendor_name.lower() in detected_vendor_names:
+                continue
+            
+            # Add to detected list
+            detected.append({
+                'vendor_name': vendor_name,
+                'category': tracker_match['category'],
+                'detected': True,
+                'matching_domains': tracker_match['matching_domains'],
+                'details': '',
+                'source': 'tracker_db'
+            })
+            detected_vendor_names.add(vendor_name.lower())
+            matched_domains.add(domain)
+    
+    return detected
 
 
 def match_vendors(requests: list[str], vendors: list[dict] = None) -> list[dict]:
@@ -179,6 +304,10 @@ def find_unknown_domains(requests: list[str], base_domain: str, vendors: list[di
                 break
 
         if is_known:
+            continue
+        
+        # Check if matches tracker_db (whotracks.me fallback)
+        if match_tracker_db(domain):
             continue
 
         # Extract base domain for grouping

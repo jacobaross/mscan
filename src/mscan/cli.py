@@ -11,7 +11,7 @@ from rich.text import Text
 from rich.status import Status
 
 from mscan.scanner import scan_website_sync
-from mscan.fingerprints import match_vendors, load_vendors, get_vendors_path, find_unknown_domains, get_all_categories
+from mscan.fingerprints import match_vendors, match_vendors_extended, load_vendors, get_vendors_path, find_unknown_domains, get_all_categories
 from mscan.report import generate_report
 
 # Competitive categories - these get special attention in takeaways
@@ -397,8 +397,8 @@ def scan(url: str, timeout: int, pages: int, headless: bool, system_browser: boo
     requests = scan_results.get('requests', [])
     console.print(f"[green]✓[/green] Scanned {len(pages_scanned)} pages, captured {len(requests)} network requests")
 
-    # Phase 2: Match vendors
-    detected = match_vendors(requests)
+    # Phase 2: Match vendors (vendors.json + tracker_db.json fallback)
+    detected = match_vendors_extended(requests)
     console.print(f"[green]✓[/green] Matched {len(detected)} vendors from database")
 
     # Phase 3: Find unknown domains
@@ -776,8 +776,8 @@ def batch(file: str, timeout: int, pages: int, headless: bool, system_browser: b
 
                 requests = scan_results.get('requests', [])
 
-                # Match vendors
-                detected = match_vendors(requests)
+                # Match vendors (vendors.json + tracker_db.json fallback)
+                detected = match_vendors_extended(requests)
 
                 # Find unknown domains
                 unknown_domains = find_unknown_domains(requests, domain_name)
