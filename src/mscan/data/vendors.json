@@ -553,6 +553,141 @@
           "uwt.js"
         ]
       }
+    },
+    {
+      "vendor_name": "HubSpot",
+      "category": "Email",
+      "detection_rules": {
+        "domains": [
+          "hsforms.com",
+          "hs-scripts.com",
+          "hs-analytics.net",
+          "hscollectedforms.net",
+          "hsforms.net",
+          "hs-banner.com",
+          "hubspot.com",
+          "hubspot.net"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "AdRoll",
+      "category": "Performance",
+      "detection_rules": {
+        "domains": [
+          "adroll.com",
+          "d.adroll.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Marketo",
+      "category": "Email",
+      "detection_rules": {
+        "domains": [
+          "marketo.com",
+          "marketo.net",
+          "mktoresp.com",
+          "munchkin.marketo.net"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Tealium",
+      "category": "Analytics",
+      "detection_rules": {
+        "domains": [
+          "tealiumiq.com",
+          "tealium.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "AppNexus",
+      "category": "DSP",
+      "detection_rules": {
+        "domains": [
+          "adnxs.com",
+          "adnxs.net",
+          "appnexus.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Index Exchange",
+      "category": "SSP",
+      "detection_rules": {
+        "domains": [
+          "casalemedia.com",
+          "indexexchange.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Amazon Ads",
+      "category": "DSP",
+      "detection_rules": {
+        "domains": [
+          "amazon-adsystem.com",
+          "amazonadsystem.com",
+          "assoc-amazon.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Drip",
+      "category": "Email",
+      "detection_rules": {
+        "domains": [
+          "getdrip.com",
+          "drip.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "AWIN",
+      "category": "Affiliate",
+      "detection_rules": {
+        "domains": [
+          "dwin1.com",
+          "awin.com",
+          "awin1.com",
+          "zenaps.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "AddThis",
+      "category": "Social Media",
+      "detection_rules": {
+        "domains": [
+          "addthis.com",
+          "addthiscdn.com",
+          "addthisedge.com"
+        ],
+        "url_patterns": []
+      }
+    },
+    {
+      "vendor_name": "Nielsen",
+      "category": "Analytics",
+      "detection_rules": {
+        "domains": [
+          "imrworldwide.com",
+          "nielsen.com",
+          "exelator.com"
+        ],
+        "url_patterns": []
+      }
     }
   ]
 }
