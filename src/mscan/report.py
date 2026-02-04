@@ -6,12 +6,17 @@ from urllib.parse import urlparse
 
 from mscan.fingerprints import get_all_categories, load_vendors
 
-
+# Competitive categories - these get special attention in takeaways
+COMPETITIVE_CATEGORIES = [
+    'Direct Mail',
+    'CTV',
+]
 
 
 def generate_report(
     scan_results: dict,
     detected_vendors: list[dict],
+    unknown_domains: list[dict] = None,
     output_dir: str = None
 ) -> str:
     """
@@ -20,6 +25,7 @@ def generate_report(
     Args:
         scan_results: Results from scanner containing requests and pages scanned
         detected_vendors: List of detected vendors with details
+        unknown_domains: List of unknown third-party domains
         output_dir: Directory to save report (defaults to ./reports/)
 
     Returns:
@@ -31,6 +37,9 @@ def generate_report(
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
 
+    if unknown_domains is None:
+        unknown_domains = []
+
     base_url = scan_results.get('base_url', '')
     brand_name = _extract_brand_name(base_url)
     scan_date = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -38,10 +47,11 @@ def generate_report(
 
     # Build report sections
     header = _build_header(brand_name, base_url, scan_date, len(pages_scanned))
-    summary = _build_summary(detected_vendors)
-    vendor_table = _build_vendor_table(detected_vendors)
+    findings = _build_findings(detected_vendors)
+    takeaways = _build_takeaways(detected_vendors)
+    unknown_table = _build_unknown_domains_table(unknown_domains)
 
-    report = f"{header}\n\n{summary}\n\n{vendor_table}"
+    report = f"{header}\n\n{findings}\n\n{takeaways}\n\n{unknown_table}"
 
     # Save report
     safe_brand = brand_name.lower().replace(' ', '-').replace('.', '-')
@@ -85,23 +95,16 @@ def _build_header(brand_name: str, url: str, scan_date: str, pages_count: int) -
     return '\n'.join(lines)
 
 
-def _build_summary(detected_vendors: list[dict]) -> str:
-    """Build the summary section based on detected vendors."""
-    width = 60
-    lines = [
-        "",
-        "-" * width,
-        "SUMMARY".center(width),
-        "-" * width,
-    ]
+def _build_findings(detected_vendors: list[dict]) -> str:
+    """Build the FINDINGS section mirroring terminal output."""
+    lines = ["FINDINGS"]
 
     if not detected_vendors:
-        lines.append("")
         lines.append("  No martech vendors detected from the fingerprint database.")
         lines.append("  Site may use unlisted vendors or block tracking scripts.")
         return '\n'.join(lines)
 
-    # Group by category for analysis
+    # Group by category
     by_category = {}
     for vendor in detected_vendors:
         cat = vendor['category']
@@ -109,106 +112,132 @@ def _build_summary(detected_vendors: list[dict]) -> str:
             by_category[cat] = []
         by_category[cat].append(vendor)
 
-    lines.append("")
-
-    # Use dynamic category order from database
+    # Get category order and totals
     category_order = get_all_categories()
-
-    for cat in category_order:
-        if cat not in by_category:
-            continue
-
-        vendors = by_category[cat]
-        names = [v['vendor_name'] for v in vendors]
-
-        # Special handling for certain categories
-        if cat == 'Direct Mail':
-            # Include details (e.g., client IDs) for competitive category
-            details = [v['details'] for v in vendors if v.get('details')]
-            detail_str = f" ({details[0]})" if details else ""
-            lines.append(f"  * {cat}: {', '.join(names)}{detail_str}")
-        elif cat == 'Social Media' and len(names) >= 3:
-            # Flag heavy social presence
-            lines.append(f"  * {cat} (heavy): {', '.join(names)}")
-        else:
-            lines.append(f"  * {cat}: {', '.join(names)}")
-
-    # Summary stat
-    total = len(detected_vendors)
-    categories = len(by_category)
-    lines.append("")
-    lines.append(f"  Total: {total} vendors across {categories} categories")
-
-    return '\n'.join(lines)
-
-
-def _build_vendor_table(detected_vendors: list[dict]) -> str:
-    """Build a single vendor table with category sections."""
-    width = 60
-    col_vendor = 24
-    col_status = 10
-    col_details = 22
-
-    lines = [
-        "",
-        "-" * width,
-        "VENDOR DETAILS".center(width),
-        "-" * width,
-    ]
-
     all_vendors = load_vendors()
+    total_in_db = len(all_vendors)
+    total_categories = len(category_order)
 
-    # Create lookup for detected vendors
-    detected_names = {v['vendor_name'] for v in detected_vendors}
-    detected_lookup = {v['vendor_name']: v for v in detected_vendors}
+    # Show findings by category
+    for cat in category_order:
+        if cat in by_category:
+            vendors = by_category[cat]
+            vendor_names = [v['vendor_name'] for v in vendors]
+            count_prefix = f"[{len(vendors)}]"
+            lines.append(f"  {count_prefix} {cat}: {', '.join(vendor_names)}")
 
-    # Group vendors by category
-    vendors_by_cat = {}
-    for vendor in all_vendors:
-        cat = vendor['category']
-        if cat not in vendors_by_cat:
-            vendors_by_cat[cat] = []
-        vendors_by_cat[cat].append(vendor)
-
-    # Table header
+    # Stats line
     lines.append("")
-    header = f"  {'Vendor':<{col_vendor}} {'Status':<{col_status}} {'Details':<{col_details}}"
-    lines.append(header)
-    lines.append("  " + "-" * (width - 4))
-
-    # Process categories in dynamic order from database
-    for category in get_all_categories():
-        if category not in vendors_by_cat:
-            continue
-
-        category_vendors = vendors_by_cat[category]
-
-        # Category separator (uppercase for display)
-        lines.append("")
-        lines.append(f"  [{category.upper()}]")
-
-        for vendor in sorted(category_vendors, key=lambda v: v['vendor_name']):
-            name = vendor['vendor_name']
-            if name in detected_names:
-                detected_info = detected_lookup[name]
-                status = "YES"
-                details = detected_info.get('details', '')
-                if not details and detected_info.get('matching_domains'):
-                    details = detected_info['matching_domains'][0]
-                # Truncate details if too long
-                if len(details) > col_details:
-                    details = details[:col_details-3] + "..."
-            else:
-                status = "-"
-                details = ""
-
-            # Truncate vendor name if too long
-            display_name = name if len(name) <= col_vendor else name[:col_vendor-3] + "..."
-            lines.append(f"  {display_name:<{col_vendor}} {status:<{col_status}} {details:<{col_details}}")
-
-    lines.append("")
-    lines.append("=" * width)
+    lines.append(f"  Categories: {len(by_category)} of {total_categories}  |  Vendors: {len(detected_vendors)} of {total_in_db} in database")
 
     return '\n'.join(lines)
 
 
+def _build_takeaways(detected_vendors: list[dict]) -> str:
+    """Build the TAKEAWAY section with actionable insights."""
+    lines = ["TAKEAWAY"]
+
+    # Group by category
+    by_category = {}
+    for vendor in detected_vendors:
+        cat = vendor['category']
+        if cat not in by_category:
+            by_category[cat] = []
+        by_category[cat].append(vendor)
+
+    takeaways = []
+
+    # Check Direct Mail (competitive)
+    dm_cat = 'Direct Mail'
+    if dm_cat in by_category:
+        dm_vendors = [v['vendor_name'] for v in by_category[dm_cat]]
+        takeaways.append(f"Competitor alert: Using {', '.join(dm_vendors)} for direct mail")
+    else:
+        takeaways.append("No direct mail vendor - potential prospect")
+
+    # Check CTV (competitive)
+    ctv_cat = 'CTV'
+    if ctv_cat in by_category:
+        ctv_vendors = [v['vendor_name'] for v in by_category[ctv_cat]]
+        takeaways.append(f"Competitor alert: Using {', '.join(ctv_vendors)} for CTV")
+    else:
+        takeaways.append("No CTV vendor - potential prospect")
+
+    # Social stack assessment
+    social_cat = 'Social Media'
+    if social_cat in by_category:
+        social_count = len(by_category[social_cat])
+        if social_count >= 3:
+            takeaways.append(f"Heavy social presence ({social_count} platforms) - likely D2C brand")
+
+    # Stack sophistication
+    if len(detected_vendors) == 0:
+        takeaways.append("No detectable martech stack")
+    elif len(detected_vendors) <= 2:
+        takeaways.append("Basic martech stack - may be early-stage or privacy-focused")
+    elif len(detected_vendors) >= 8:
+        takeaways.append("Sophisticated martech stack - mature marketing operation")
+
+    for takeaway in takeaways:
+        lines.append(f"  → {takeaway}")
+
+    return '\n'.join(lines)
+
+
+def _build_unknown_domains_table(unknown_domains: list[dict]) -> str:
+    """Build the UNKNOWN DOMAINS table with box-drawing characters."""
+    lines = ["UNKNOWN DOMAINS"]
+
+    if not unknown_domains:
+        lines.append("  No unknown third-party domains detected.")
+        return '\n'.join(lines)
+
+    lines.append("")
+
+    # Calculate column widths based on content
+    col_num_width = max(3, len(str(len(unknown_domains))))
+    col_domain_width = max(20, max(len(d['domain']) for d in unknown_domains))
+    col_requests_width = max(8, max(len(str(d['count'])) for d in unknown_domains))
+
+    # Calculate full domains column - show up to 60 chars
+    def format_full_domains(full_domains: list[str]) -> str:
+        if len(full_domains) == 1:
+            return full_domains[0]
+        result = ', '.join(full_domains[:2])
+        if len(full_domains) > 2:
+            result += f" (+{len(full_domains) - 2})"
+        return result
+
+    full_domain_strs = [format_full_domains(d['full_domains']) for d in unknown_domains]
+    col_full_width = max(20, min(60, max(len(s) for s in full_domain_strs)))
+
+    # Build table
+    # Header row
+    top_border = f"┏━{'━' * col_num_width}━┳━{'━' * col_domain_width}━┳━{'━' * col_requests_width}━┳━{'━' * col_full_width}━┓"
+    header_row = f"┃ {'#':<{col_num_width}} ┃ {'Domain':<{col_domain_width}} ┃ {'Requests':>{col_requests_width}} ┃ {'Full Domains':<{col_full_width}} ┃"
+    header_sep = f"┡━{'━' * col_num_width}━╇━{'━' * col_domain_width}━╇━{'━' * col_requests_width}━╇━{'━' * col_full_width}━┩"
+
+    lines.append(top_border)
+    lines.append(header_row)
+    lines.append(header_sep)
+
+    # Data rows
+    for i, domain_info in enumerate(unknown_domains, 1):
+        domain = domain_info['domain']
+        requests = str(domain_info['count'])
+        full_domains_str = full_domain_strs[i - 1]
+
+        # Truncate if needed
+        if len(domain) > col_domain_width:
+            domain = domain[:col_domain_width - 3] + "..."
+        if len(full_domains_str) > col_full_width:
+            full_domains_str = full_domains_str[:col_full_width - 3] + "..."
+
+        row = f"│ {i:<{col_num_width}} │ {domain:<{col_domain_width}} │ {requests:>{col_requests_width}} │ {full_domains_str:<{col_full_width}} │"
+        lines.append(row)
+
+    # Bottom border
+    bottom_border = f"└─{'─' * col_num_width}─┴─{'─' * col_domain_width}─┴─{'─' * col_requests_width}─┴─{'─' * col_full_width}─┘"
+    lines.append(bottom_border)
+
+    return '\n'.join(lines)

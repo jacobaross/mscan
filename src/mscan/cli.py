@@ -407,7 +407,7 @@ def scan(url: str, timeout: int, pages: int, headless: bool, system_browser: boo
     console.print(f"[green]✓[/green] Found {len(unknown_domains)} unknown third-party domains")
 
     # Phase 4: Generate report
-    report_path = generate_report(scan_results, detected)
+    report_path = generate_report(scan_results, detected, unknown_domains)
     console.print(f"[green]✓[/green] Report generated")
 
     # Print insightful summary
