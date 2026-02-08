@@ -116,19 +116,18 @@ def _build_findings(detected_vendors: list[dict]) -> str:
     category_order = get_all_categories()
     all_vendors = load_vendors()
     total_in_db = len(all_vendors)
-    total_categories = len(category_order)
 
     # Show findings by category
     for cat in category_order:
         if cat in by_category:
             vendors = by_category[cat]
             vendor_names = [v['vendor_name'] for v in vendors]
-            count_prefix = f"[{len(vendors)}]"
-            lines.append(f"  {count_prefix} {cat}: {', '.join(vendor_names)}")
+            count = len(vendors)
+            lines.append(f"  {cat} ({count}): {', '.join(vendor_names)}")
 
     # Stats line
     lines.append("")
-    lines.append(f"  Categories: {len(by_category)} of {total_categories}  |  Vendors: {len(detected_vendors)} of {total_in_db} in database")
+    lines.append(f"  {len(by_category)}/{len(category_order)} categories - {len(detected_vendors)}/{total_in_db} vendors")
 
     return '\n'.join(lines)
 
@@ -151,35 +150,35 @@ def _build_takeaways(detected_vendors: list[dict]) -> str:
     dm_cat = 'Direct Mail'
     if dm_cat in by_category:
         dm_vendors = [v['vendor_name'] for v in by_category[dm_cat]]
-        takeaways.append(f"Competitor alert: Using {', '.join(dm_vendors)} for direct mail")
+        takeaways.append(f"[Competitor] Using {', '.join(dm_vendors)} for direct mail")
     else:
-        takeaways.append("No direct mail vendor - potential prospect")
+        takeaways.append("[Opportunity] No direct mail vendor - potential prospect")
 
     # Check CTV (competitive)
     ctv_cat = 'CTV'
     if ctv_cat in by_category:
         ctv_vendors = [v['vendor_name'] for v in by_category[ctv_cat]]
-        takeaways.append(f"Competitor alert: Using {', '.join(ctv_vendors)} for CTV")
+        takeaways.append(f"[Competitor] Using {', '.join(ctv_vendors)} for CTV")
     else:
-        takeaways.append("No CTV vendor - potential prospect")
+        takeaways.append("[Opportunity] No CTV vendor - potential prospect")
 
     # Social stack assessment
     social_cat = 'Social Media'
     if social_cat in by_category:
         social_count = len(by_category[social_cat])
         if social_count >= 3:
-            takeaways.append(f"Heavy social presence ({social_count} platforms) - likely D2C brand")
+            takeaways.append(f"[Insight] Heavy social presence ({social_count} platforms) - likely D2C brand")
 
     # Stack sophistication
     if len(detected_vendors) == 0:
-        takeaways.append("No detectable martech stack")
+        takeaways.append("[Warning] No detectable martech stack")
     elif len(detected_vendors) <= 2:
-        takeaways.append("Basic martech stack - may be early-stage or privacy-focused")
+        takeaways.append("[Info] Basic martech stack - may be early-stage or privacy-focused")
     elif len(detected_vendors) >= 8:
-        takeaways.append("Sophisticated martech stack - mature marketing operation")
+        takeaways.append("[Insight] Sophisticated martech stack - mature marketing operation")
 
     for takeaway in takeaways:
-        lines.append(f"  → {takeaway}")
+        lines.append(f"  {takeaway}")
 
     return '\n'.join(lines)
 

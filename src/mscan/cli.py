@@ -4,15 +4,19 @@ import json
 import click
 from pathlib import Path
 from urllib.parse import urlparse
+from datetime import datetime
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.status import Status
+from rich.table import Table
+from rich import box
 
 from mscan.scanner import scan_website_sync
 from mscan.fingerprints import match_vendors, match_vendors_extended, load_vendors, get_vendors_path, find_unknown_domains, get_all_categories
 from mscan.report import generate_report
+from mscan.enricher import EdgarClient, ProfileBuilder
 
 # Competitive categories - these get special attention in takeaways
 COMPETITIVE_CATEGORIES = [
@@ -35,8 +39,10 @@ def extract_domain_name(url: str) -> str:
     return domain.replace('www.', '')
 
 
-def print_scan_summary(detected: list[dict], url: str, report_path: str, console: Console):
+def print_scan_summary(detected: list[dict], url: str, report_path: str, console: Console, enriched_brand=None):
     """Print an insightful summary of scan results with actionable takeaways."""
+    from mscan.models.enriched_brand import EnrichedBrand
+    
     domain = extract_domain_name(url)
     all_vendors = load_vendors()
     total_in_db = len(all_vendors)
@@ -51,11 +57,17 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
 
     # Build the summary text
     console.print()
-    console.rule(f"[bold]SCAN COMPLETE: {domain.upper()}[/bold]", style="cyan")
+    header = Panel(
+        f"[bold white]SCAN COMPLETE[/bold white]\n[cyan]{domain.upper()}[/cyan]",
+        style="cyan",
+        padding=(0, 2),
+        expand=False,
+    )
+    console.print(header, justify="center")
     console.print()
 
     # === FINDINGS ===
-    console.print("[bold]FINDINGS[/bold]")
+    console.print("[bold]📊 FINDINGS[/bold]")
 
     if not detected:
         console.print("  [dim]No martech vendors detected from the fingerprint database.[/dim]")
@@ -68,23 +80,22 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
             if cat in by_category:
                 vendors = by_category[cat]
                 vendor_names = [v['vendor_name'] for v in vendors]
+                count = len(vendors)
 
-                count_prefix = f"[{len(vendors)}]"
-
-                # Highlight competitive categories
+                # Highlight competitive categories with ⚡
                 if cat in COMPETITIVE_CATEGORIES:
-                    console.print(f"  [yellow]{count_prefix} {cat}:[/yellow] {', '.join(vendor_names)}")
+                    console.print(f"  [yellow]⚡ {cat} ({count}):[/yellow] {', '.join(vendor_names)}")
                 else:
-                    console.print(f"  [dim]{count_prefix}[/dim] [white]{cat}:[/white] {', '.join(vendor_names)}")
+                    console.print(f"  [white]{cat} ({count}):[/white] {', '.join(vendor_names)}")
 
         # Stats line
         console.print()
         total_categories = len(get_all_categories())
-        console.print(f"  [dim]Categories: {len(by_category)} of {total_categories}  |  Vendors: {len(detected)} of {total_in_db} in database[/dim]")
+        console.print(f"  [dim]{len(by_category)}/{total_categories} categories - {len(detected)}/{total_in_db} vendors[/dim]")
 
     # === TAKEAWAY ===
     console.print()
-    console.print("[bold]TAKEAWAY[/bold]")
+    console.print("[bold]💡 TAKEAWAY[/bold]")
 
     takeaways = []
 
@@ -92,35 +103,51 @@ def print_scan_summary(detected: list[dict], url: str, report_path: str, console
     dm_cat = 'Direct Mail'
     if dm_cat in by_category:
         dm_vendors = [v['vendor_name'] for v in by_category[dm_cat]]
-        takeaways.append(f"[yellow]Competitor alert:[/yellow] Using {', '.join(dm_vendors)} for direct mail")
+        takeaways.append(f"🔶 [yellow]Competitor:[/yellow] Using {', '.join(dm_vendors)} for direct mail")
     else:
-        takeaways.append("[green]No direct mail vendor[/green] - potential prospect")
+        takeaways.append("✅ [green]No direct mail vendor[/green] - potential prospect")
 
     # Check CTV (competitive)
     ctv_cat = 'CTV'
     if ctv_cat in by_category:
         ctv_vendors = [v['vendor_name'] for v in by_category[ctv_cat]]
-        takeaways.append(f"[yellow]Competitor alert:[/yellow] Using {', '.join(ctv_vendors)} for CTV")
+        takeaways.append(f"🔶 [yellow]Competitor:[/yellow] Using {', '.join(ctv_vendors)} for CTV")
     else:
-        takeaways.append("[green]No CTV vendor[/green] - potential prospect")
+        takeaways.append("✅ [green]No CTV vendor[/green] - potential prospect")
 
     # Social stack assessment
     social_cat = 'Social Media'
     if social_cat in by_category:
         social_count = len(by_category[social_cat])
         if social_count >= 3:
-            takeaways.append(f"Heavy social presence ({social_count} platforms) - likely D2C brand")
+            takeaways.append(f"📱 Heavy social presence ({social_count} platforms) - likely D2C brand")
 
     # Stack sophistication
     if len(detected) == 0:
-        takeaways.append("No detectable martech stack")
+        takeaways.append("⚠️  No detectable martech stack")
     elif len(detected) <= 2:
-        takeaways.append("Basic martech stack - may be early-stage or privacy-focused")
+        takeaways.append("ℹ️  Basic martech stack - may be early-stage or privacy-focused")
     elif len(detected) >= 8:
-        takeaways.append("Sophisticated martech stack - mature marketing operation")
+        takeaways.append("🔷 Sophisticated martech stack - mature marketing operation")
+
+    # SEC enrichment data
+    if enriched_brand and enriched_brand.sec_profile:
+        fin = enriched_brand.sec_profile.latest_financials
+        if fin and fin.revenue_usd:
+            rev_b = fin.revenue_usd / 1_000_000_000
+            if rev_b >= 10:
+                takeaways.append(f"📊 [cyan]SEC:[/cyan] Large public company (${rev_b:.0f}B revenue)")
+            elif rev_b >= 1:
+                takeaways.append(f"📊 [cyan]SEC:[/cyan] Mid-market public company (${rev_b:.1f}B revenue)")
+            else:
+                takeaways.append(f"📊 [cyan]SEC:[/cyan] Public company (${rev_b:.2f}B revenue)")
+        
+        if enriched_brand.qualification_score > 0:
+            score_color = "green" if enriched_brand.qualification_score >= 70 else "yellow" if enriched_brand.qualification_score >= 40 else "red"
+            takeaways.append(f"⭐ [cyan]Qualification Score:[/cyan] [{score_color}]{enriched_brand.qualification_score}/100[/{score_color}]")
 
     for takeaway in takeaways:
-        console.print(f"  → {takeaway}")
+        console.print(f"  {takeaway}")
 
     # === REPORT ===
     console.print()
@@ -366,17 +393,21 @@ def cli():
 @click.option('--headless', is_flag=True, help='Run in headless mode (may be blocked by bot detection)')
 @click.option('--system-browser', '-s', is_flag=True, help='Use system Chromium (bypasses Akamai/bot detection)')
 @click.option('--show-report', '-r', is_flag=True, help='Display full report in terminal after scan')
-def scan(url: str, timeout: int, pages: int, headless: bool, system_browser: bool, show_report: bool):
+@click.option('--enrich', '-e', is_flag=True, help='Enrich with SEC EDGAR data if public company')
+def scan(url: str, timeout: int, pages: int, headless: bool, system_browser: bool, show_report: bool, enrich: bool):
     """Scan a website for martech vendors.
 
     URL can be a domain (example.com) or full URL (https://example.com)
     """
     console = Console()
     url = normalize_url(url)
+    base_domain = extract_domain_name(url)
 
     console.print(f"[bold]Scanning {url}...[/bold]")
     console.print(f"  Timeout: {timeout}s per page")
     console.print(f"  Max pages: {pages + 1} (homepage + {pages} internal)")
+    if enrich:
+        console.print(f"  [cyan]SEC enrichment enabled[/cyan]")
     console.print()
 
     # Phase 1: Scan website with live status updates
@@ -402,16 +433,49 @@ def scan(url: str, timeout: int, pages: int, headless: bool, system_browser: boo
     console.print(f"[green]✓[/green] Matched {len(detected)} vendors from database")
 
     # Phase 3: Find unknown domains
-    base_domain = extract_domain_name(url)
     unknown_domains = find_unknown_domains(requests, base_domain)
     console.print(f"[green]✓[/green] Found {len(unknown_domains)} unknown third-party domains")
 
-    # Phase 4: Generate report
+    # Phase 4: SEC Enrichment (if enabled)
+    enriched_brand = None
+    if enrich:
+        console.print(f"[bold green]Enriching with SEC data...[/bold green]")
+        try:
+            user_agent = _get_user_agent()
+            with EdgarClient(user_agent=user_agent) as client:
+                builder = ProfileBuilder()
+                
+                # Try to enrich by domain name (as company name)
+                company_name = base_domain.replace('www.', '').split('.')[0].capitalize()
+                
+                with console.status(f"[green]Looking up {company_name}...", spinner="dots"):
+                    result = client.enrich_by_name(company_name)
+                
+                if result.success:
+                    scan_data = {
+                        'vendors': detected,
+                        'scanned_at': datetime.now()
+                    }
+                    enriched_brand = builder.build_profile_from_enrichment(
+                        base_domain, result, scan_data
+                    )
+                    console.print(f"[green]✓[/green] Enriched: [cyan]{enriched_brand.sec_profile.company_name}[/cyan]")
+                    if enriched_brand.sec_profile.latest_financials:
+                        fin = enriched_brand.sec_profile.latest_financials
+                        if fin.revenue_usd:
+                            rev_b = fin.revenue_usd / 1_000_000_000
+                            console.print(f"    Revenue: ${rev_b:.1f}B | Score: {enriched_brand.qualification_score}")
+                else:
+                    console.print(f"[yellow]⚠[/yellow] Could not enrich (may be private company)")
+        except Exception as e:
+            console.print(f"[yellow]⚠[/yellow] Enrichment failed: {str(e)}")
+
+    # Phase 5: Generate report
     report_path = generate_report(scan_results, detected, unknown_domains)
     console.print(f"[green]✓[/green] Report generated")
 
     # Print insightful summary
-    print_scan_summary(detected, url, report_path, console)
+    print_scan_summary(detected, url, report_path, console, enriched_brand)
 
     # Show full report if requested via flag
     if show_report:
@@ -419,6 +483,14 @@ def scan(url: str, timeout: int, pages: int, headless: bool, system_browser: boo
         console.rule("[bold]FULL REPORT[/bold]", style="cyan")
         with open(report_path, 'r') as f:
             console.print(f.read())
+    
+    # Show enriched profile if available
+    if enriched_brand:
+        console.print()
+        console.print("[bold cyan]View enriched profile?[/bold cyan] (y/n)")
+        if click.confirm("", default=False):
+            console.print()
+            _display_profile(console, enriched_brand)
 
     # Interactive options loop
     while True:
@@ -1051,6 +1123,314 @@ def manage_categories():
                     categories = [c for c in categories if c != cat_name]
             else:
                 console.print("  [red]Invalid category number[/red]")
+
+
+def _get_user_agent() -> str:
+    """Get user agent for SEC EDGAR API from config or use default."""
+    # Try to get from config file if it exists
+    config_path = Path.home() / '.mscan' / 'config.json'
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                config = json.load(f)
+                return config.get('edgar_user_agent', 'mscan user@example.com')
+        except Exception:
+            pass
+    return 'mscan user@example.com'
+
+
+@cli.command('enrich')
+@click.argument('identifier', required=False)
+@click.option('--file', '-f', type=click.Path(exists=True), help='File with domains/tickers (one per line)')
+@click.option('--refresh', is_flag=True, help='Force refresh from SEC EDGAR API')
+@click.option('--output', '-o', type=click.Path(), help='Output file for results (JSON)')
+def enrich(identifier: str, file: str, refresh: bool, output: str):
+    """Enrich company data with SEC EDGAR information.
+    
+    IDENTIFIER can be a ticker (AAPL), domain (apple.com), or company name.
+    Use --file for batch enrichment of multiple companies.
+    
+    Examples:
+        mscan enrich AAPL                    # By ticker
+        mscan enrich apple.com               # By domain
+        mscan enrich "Apple Inc"             # By company name
+        mscan enrich AAPL --refresh          # Force refresh
+        mscan enrich --file companies.txt    # Batch enrichment
+    """
+    console = Console()
+    
+    # Validate input
+    if not identifier and not file:
+        console.print("[red]Error: Provide an identifier or use --file[/red]")
+        raise click.UsageError("Must provide identifier or --file")
+    
+    if identifier and file:
+        console.print("[red]Error: Cannot use both identifier and --file[/red]")
+        raise click.UsageError("Use either identifier or --file, not both")
+    
+    # Get identifiers to process
+    identifiers = []
+    if file:
+        with open(file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    identifiers.append(line)
+        console.print(f"[bold]Batch enriching {len(identifiers)} companies...[/bold]\n")
+    else:
+        identifiers = [identifier]
+    
+    # Initialize clients
+    user_agent = _get_user_agent()
+    
+    try:
+        with EdgarClient(user_agent=user_agent) as client:
+            builder = ProfileBuilder()
+            results = []
+            
+            for idx, ident in enumerate(identifiers, 1):
+                if len(identifiers) > 1:
+                    console.print(f"[{idx}/{len(identifiers)}] Enriching: [cyan]{ident}[/cyan]")
+                else:
+                    console.print(f"Enriching: [cyan]{ident}[/cyan]")
+                
+                # Determine if ticker, domain, or name
+                ident_clean = ident.strip()
+                is_ticker = (
+                    len(ident_clean) <= 5 and 
+                    ident_clean.isalpha() and 
+                    ident_clean.isupper()
+                )
+                
+                # Attempt enrichment
+                try:
+                    if is_ticker:
+                        result = client.enrich_by_ticker(ident_clean)
+                    elif '.' in ident_clean and not ident_clean.isupper():
+                        # Looks like a domain
+                        # First try to resolve ticker from domain (future feature)
+                        # For now, try name lookup
+                        domain = ident_clean.replace('https://', '').replace('http://', '').strip('/')
+                        result = client.enrich_by_name(domain.split('.')[0].capitalize())
+                        if not result.success:
+                            # Try direct name
+                            result = client.enrich_by_name(ident_clean)
+                    else:
+                        # Treat as company name
+                        result = client.enrich_by_name(ident_clean)
+                    
+                    # Build profile
+                    domain = ident_clean if '.' in ident_clean else f"{ident_clean.lower()}.com"
+                    brand = builder.build_profile_from_enrichment(domain, result)
+                    results.append({
+                        'identifier': ident,
+                        'success': True,
+                        'brand': brand.model_dump() if hasattr(brand, 'model_dump') else brand.dict()
+                    })
+                    
+                    # Print summary
+                    if result.success:
+                        console.print(f"  [green]✓[/green] {brand.sec_profile.company_name if brand.sec_profile else 'Unknown'}")
+                        if brand.sec_profile and brand.sec_profile.latest_financials:
+                            fin = brand.sec_profile.latest_financials
+                            if fin.revenue_usd:
+                                rev_b = fin.revenue_usd / 1_000_000_000
+                                console.print(f"    Revenue: ${rev_b:.1f}B | Score: {brand.qualification_score}")
+                    else:
+                        console.print(f"  [yellow]⚠[/yellow] {result.error.message if result.error else 'Unknown error'}")
+                    
+                except Exception as e:
+                    console.print(f"  [red]✗[/red] Error: {str(e)}")
+                    results.append({
+                        'identifier': ident,
+                        'success': False,
+                        'error': str(e)
+                    })
+            
+            # Print summary for batch
+            if len(identifiers) > 1:
+                success_count = sum(1 for r in results if r.get('success'))
+                console.print(f"\n[bold]Completed:[/bold] {success_count}/{len(identifiers)} successful")
+            
+            # Save to file if requested
+            if output:
+                with open(output, 'w') as f:
+                    json.dump(results, f, indent=2, default=str)
+                console.print(f"[green]Results saved to {output}[/green]")
+    
+    except Exception as e:
+        console.print(f"[red]Error initializing EDGAR client: {e}[/red]")
+        raise click.Abort()
+
+
+@cli.command('profile')
+@click.argument('identifier')
+@click.option('--refresh', is_flag=True, help='Force refresh from SEC EDGAR API')
+def profile(identifier: str, refresh: bool):
+    """Display detailed enriched profile for a company.
+    
+    IDENTIFIER can be a ticker (AAPL), domain (apple.com), or company name.
+    
+    Examples:
+        mscan profile AAPL                    # By ticker
+        mscan profile apple.com               # By domain
+        mscan profile "Apple Inc"             # By company name
+    """
+    console = Console()
+    console.print(f"[bold]Loading profile for:[/bold] [cyan]{identifier}[/cyan]\n")
+    
+    user_agent = _get_user_agent()
+    
+    try:
+        with EdgarClient(user_agent=user_agent) as client:
+            builder = ProfileBuilder()
+            
+            # Determine lookup method
+            ident_clean = identifier.strip()
+            is_ticker = (
+                len(ident_clean) <= 5 and 
+                ident_clean.isalpha() and 
+                ident_clean.isupper()
+            )
+            
+            # Get enrichment result
+            with console.status("[green]Fetching SEC data...", spinner="dots"):
+                if is_ticker:
+                    result = client.enrich_by_ticker(ident_clean)
+                else:
+                    result = client.enrich_by_name(ident_clean)
+            
+            if not result.success:
+                console.print(f"[red]Error:[/red] {result.error.message if result.error else 'Failed to enrich'}")
+                return
+            
+            # Build and display profile
+            domain = ident_clean if '.' in ident_clean else f"{ident_clean.lower()}.com"
+            brand = builder.build_profile_from_enrichment(domain, result)
+            
+            # Display profile
+            _display_profile(console, brand)
+    
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {str(e)}")
+
+
+def _display_profile(console: Console, brand):
+    """Display a rich profile output."""
+    
+    # Header
+    if brand.sec_profile:
+        header_text = f"[bold white]{brand.sec_profile.company_name}[/bold white]"
+        if brand.sec_profile.ticker:
+            header_text += f" [cyan]({brand.sec_profile.ticker})[/cyan]"
+        console.print(Panel(header_text, style="bold blue", expand=False))
+    else:
+        console.print(Panel(f"[bold white]{brand.domain}[/bold white]", style="bold blue", expand=False))
+    
+    console.print()
+    
+    # Basic Info
+    if brand.sec_profile:
+        console.print("[bold]📋 COMPANY INFORMATION[/bold]")
+        info_table = Table(show_header=False, box=None)
+        info_table.add_column("Field", style="dim")
+        info_table.add_column("Value", style="white")
+        
+        if brand.sec_profile.sic_description:
+            info_table.add_row("Industry", brand.sec_profile.sic_description)
+        if brand.sec_profile.exchange:
+            info_table.add_row("Exchange", brand.sec_profile.exchange)
+        if brand.sec_profile.fiscal_year_end:
+            info_table.add_row("Fiscal Year End", brand.sec_profile.fiscal_year_end)
+        
+        console.print(info_table)
+        console.print()
+    
+    # Financials
+    if brand.sec_profile and brand.sec_profile.latest_financials:
+        fin = brand.sec_profile.latest_financials
+        console.print("[bold]💰 FINANCIAL METRICS[/bold]")
+        
+        fin_table = Table(show_header=True, header_style="bold")
+        fin_table.add_column("Metric", style="white")
+        fin_table.add_column("Value", justify="right", style="green")
+        fin_table.add_column("Details", style="dim")
+        
+        if fin.revenue_usd:
+            rev_b = fin.revenue_usd / 1_000_000_000
+            growth = f" ({fin.revenue_growth_yoy:+.1f}%)" if fin.revenue_growth_yoy else ""
+            fin_table.add_row("Revenue", f"${rev_b:.2f}B", f"FY{fin.fiscal_year or 'Unknown'}{growth}")
+        
+        if fin.net_income_usd:
+            income_b = fin.net_income_usd / 1_000_000_000
+            fin_table.add_row("Net Income", f"${income_b:.2f}B", "")
+        
+        if fin.total_assets_usd:
+            assets_b = fin.total_assets_usd / 1_000_000_000
+            fin_table.add_row("Total Assets", f"${assets_b:.2f}B", "")
+        
+        if fin.employee_count:
+            fin_table.add_row("Employees", f"{fin.employee_count:,}", "")
+        
+        if fin.marketing_spend_usd:
+            mkt_m = fin.marketing_spend_usd / 1_000_000
+            if fin.revenue_usd:
+                mkt_pct = (fin.marketing_spend_usd / fin.revenue_usd) * 100
+                fin_table.add_row("Marketing Spend", f"${mkt_m:.0f}M", f"{mkt_pct:.1f}% of revenue")
+            else:
+                fin_table.add_row("Marketing Spend", f"${mkt_m:.0f}M", "")
+        
+        if fin.rd_spend_usd:
+            rd_m = fin.rd_spend_usd / 1_000_000
+            if fin.revenue_usd:
+                rd_pct = (fin.rd_spend_usd / fin.revenue_usd) * 100
+                fin_table.add_row("R&D Spend", f"${rd_m:.0f}M", f"{rd_pct:.1f}% of revenue")
+            else:
+                fin_table.add_row("R&D Spend", f"${rd_m:.0f}M", "")
+        
+        console.print(fin_table)
+        console.print()
+    
+    # Qualification Score
+    score_color = "green" if brand.qualification_score >= 70 else "yellow" if brand.qualification_score >= 40 else "red"
+    console.print(f"[bold]📊 QUALIFICATION SCORE:[/bold] [{score_color}]{brand.qualification_score}/100[/{score_color}]")
+    console.print(f"[dim]Confidence: {brand.confidence_level} | Data completeness: {brand.data_completeness:.0%}[/dim]")
+    console.print()
+    
+    # Insights
+    if brand.insights:
+        console.print("[bold]💡 INSIGHTS[/bold]")
+        for insight in brand.insights:
+            console.print(f"  • {insight}")
+        console.print()
+    
+    # Recommendations
+    if brand.recommendations:
+        console.print("[bold]🎯 RECOMMENDATIONS[/bold]")
+        for rec in brand.recommendations:
+            console.print(f"  • {rec}")
+        console.print()
+    
+    # Detected Technologies
+    if brand.detected_technologies:
+        console.print(f"[bold]🔧 DETECTED TECHNOLOGIES ({len(brand.detected_technologies)})[/bold]")
+        
+        # Group by category
+        by_category = {}
+        for tech in brand.detected_technologies:
+            cat = tech.get('category', 'Unknown')
+            if cat not in by_category:
+                by_category[cat] = []
+            by_category[cat].append(tech.get('vendor', 'Unknown'))
+        
+        tech_table = Table(show_header=True, header_style="bold")
+        tech_table.add_column("Category", style="cyan")
+        tech_table.add_column("Vendors", style="white")
+        
+        for cat, vendors in sorted(by_category.items()):
+            tech_table.add_row(cat, ", ".join(vendors))
+        
+        console.print(tech_table)
 
 
 @cli.command('manage-vendors')
