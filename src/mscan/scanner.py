@@ -68,7 +68,14 @@ async def scan_website(url: str, timeout_seconds: int = 10, max_internal_pages: 
         if system_browser:
             # For system browser: minimal args to avoid fingerprinting
             import shutil
+            import platform
             system_chromium = shutil.which('chromium') or shutil.which('google-chrome') or shutil.which('chromium-browser')
+            # macOS: check standard Chrome.app location
+            if not system_chromium and platform.system() == 'Darwin':
+                mac_chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                import os
+                if os.path.exists(mac_chrome):
+                    system_chromium = mac_chrome
             launch_args = {
                 'headless': headless,
                 'executable_path': system_chromium,
